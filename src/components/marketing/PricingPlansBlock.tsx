@@ -162,16 +162,9 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
-    if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'));
-      return;
-    }
-    if (!user.emailConfirmed) {
-      toast.error('Please verify your email before checkout.');
-      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
-      return;
-    }
-    const gate = assertPrelaunchCheckoutAllowed(user, 'bookworm');
+    const checkoutUserId = user?.id ?? 'guest';
+    const checkoutEmail = user?.email;
+    const gate = user ? assertPrelaunchCheckoutAllowed(user, 'bookworm') : { ok: true };
     if (!gate.ok) {
       setDupModal({ open: true, message: gate.message });
       return;
@@ -183,8 +176,8 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     }
     const res = await openPaddleCheckout({
       product,
-      userId: user.id,
-      email: user.email,
+      userId: checkoutUserId,
+      email: checkoutEmail,
       ...completedOpt,
     });
     if (!res.ok && (res.reason === 'no_paddle' || res.reason === 'no_price')) {
@@ -193,23 +186,16 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
         onCheckoutCompleted(product);
         return;
       }
-      handleGetStarted();
+      toast.error('Checkout is not configured yet.');
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, navigate, displayedBilling, completedOpt, onCheckoutCompleted, handleGetStarted]);
+  }, [user, displayedBilling, completedOpt, onCheckoutCompleted]);
 
   const lockEarlySage = useCallback(async () => {
-    if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'));
-      return;
-    }
-    if (!user.emailConfirmed) {
-      toast.error('Please verify your email before checkout.');
-      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
-      return;
-    }
-    const gate = assertPrelaunchCheckoutAllowed(user, 'sage');
+    const checkoutUserId = user?.id ?? 'guest';
+    const checkoutEmail = user?.email;
+    const gate = user ? assertPrelaunchCheckoutAllowed(user, 'sage') : { ok: true };
     if (!gate.ok) {
       setDupModal({ open: true, message: gate.message });
       return;
@@ -221,8 +207,8 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     }
     const res = await openPaddleCheckout({
       product,
-      userId: user.id,
-      email: user.email,
+      userId: checkoutUserId,
+      email: checkoutEmail,
       ...completedOpt,
     });
     if (!res.ok && (res.reason === 'no_paddle' || res.reason === 'no_price')) {
@@ -231,11 +217,11 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
         onCheckoutCompleted(product);
         return;
       }
-      handleGetStarted();
+      toast.error('Checkout is not configured yet.');
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, navigate, displayedBilling, completedOpt, onCheckoutCompleted, handleGetStarted]);
+  }, [user, displayedBilling, completedOpt, onCheckoutCompleted]);
 
   const claimGenesisSeatEarly = useCallback(() => {
     if (!user?.id) {
