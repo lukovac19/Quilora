@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { LegalBulletList, LegalParagraph, LegalSectionCard } from '../components/legal/LegalDocumentPage';
 
 export function TermsOfServiceBody() {
@@ -5,8 +6,8 @@ export function TermsOfServiceBody() {
     <>
       <LegalSectionCard id="section-1" title="1. INTRODUCTION">
         <LegalParagraph>
-          These Terms of Service (&quot;Terms&quot;) are a legally binding agreement between you (&quot;you,&quot; &quot;your&quot;) and{' '}
-          <strong>[LEGAL ENTITY NAME]</strong> (&quot;Quilora,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). These Terms govern your access to and use of our website at [WEBSITE URL], our mobile and web applications, and any related software, content, and study tools (collectively, the &quot;Services&quot;).
+          These Terms of Service (&quot;Terms&quot;) are a legally binding agreement between you (&quot;you,&quot; &quot;your&quot;) and Quilora (&quot;Quilora,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;), operated by an individual based at Nerkeza Smailagića 11, Sarajevo, Bosnia and Herzegovina. These Terms govern your access to and use of{' '}
+          <a href="https://quilora.app">https://quilora.app</a>, our web applications, and any related software, content, and study tools (collectively, the &quot;Services&quot;).
         </LegalParagraph>
         <LegalParagraph>
           <strong>By accessing or using the Services, you agree to be bound by these Terms and our Privacy Policy.</strong> If you do not agree, you must not use the Services. If you are using Quilora on behalf of an organization (like a school or company), you represent that you have the authority to bind that entity to these Terms.
@@ -45,7 +46,7 @@ export function TermsOfServiceBody() {
           <li>Maintain the security of your password.</li>
           <li>Accept responsibility for all activities occurring under your account.</li>
           <li>
-            Notify us immediately at <strong>[support@quilora.com]</strong> of any unauthorized access.
+            Notify us immediately at <strong>info.quilora.ai@gmail.com</strong> of any unauthorized access.
           </li>
         </LegalBulletList>
       </LegalSectionCard>
@@ -53,12 +54,18 @@ export function TermsOfServiceBody() {
       <LegalSectionCard id="section-5" title="5. USER CONTENT &amp; COPYRIGHT">
         <LegalParagraph>&quot;User Content&quot; includes any PDFs, EPUBs, text, or prompts you upload to the Services.</LegalParagraph>
         <LegalParagraph>
-          <strong>A. Ownership:</strong> You retain all ownership rights to your User Content.{' '}
-          <strong>B. Your Responsibility:</strong> You represent and warrant that you own the content you upload or have the legal right to use it.{' '}
-          <strong>You must not upload pirated ebooks, unauthorized scans, or copyrighted publisher materials that you do not have permission to process through AI tools.</strong>{' '}
+          <strong>A. Ownership:</strong> You retain all ownership rights to your User Content.
+        </LegalParagraph>
+        <LegalParagraph>
+          <strong>B. Your responsibility:</strong> You represent and warrant that you own the content you upload or have the legal right to use it.{' '}
+          <strong>You must not upload pirated ebooks, unauthorized scans, or copyrighted publisher materials that you do not have permission to process through AI tools.</strong>
+        </LegalParagraph>
+        <LegalParagraph>
           <strong>C. License to Quilora:</strong> You grant us a limited, worldwide, royalty-free license to host, store, and process your User Content{' '}
-          <strong>solely to provide the Services to you</strong> (e.g., to generate your flashcards or quizzes).{' '}
-          <strong>D. AI Training:</strong> We do <strong>not</strong> use your uploaded personal documents or books to train our generalized AI models for other users without your explicit, separate consent.
+          <strong>solely to provide the Services to you</strong> (for example, to generate your flashcards or quizzes).
+        </LegalParagraph>
+        <LegalParagraph>
+          <strong>D. AI training:</strong> We do <strong>not</strong> use your uploaded personal documents or books to train our generalized AI models for other users without your explicit, separate consent.
         </LegalParagraph>
       </LegalSectionCard>
 
@@ -101,14 +108,15 @@ export function TermsOfServiceBody() {
             <strong>Cancellations:</strong> You can cancel at any time through your Account Settings. Access will continue until the end of your paid period.
           </li>
           <li>
-            <strong>Refunds:</strong> Generally, payments are non-refundable. However, if you believe a charge was made in error, contact us within 7 business days (Monday through Friday).
+            <strong>Refunds:</strong> Fees are generally non-refundable. If you believe a charge was accidental or in error, contact us within <strong>48 hours</strong> of the charge. See our{' '}
+            <Link to="/refund-policy">Refund Policy</Link> and <Link to="/payments">Payments and Subscriptions Agreement</Link> for how refunds are handled (including Paddle as merchant of record).
           </li>
         </LegalBulletList>
       </LegalSectionCard>
 
       <LegalSectionCard id="section-9" title="9. INTELLECTUAL PROPERTY">
         <LegalParagraph>
-          The &quot;Quilora&quot; name, logo, UI design, and underlying algorithms are the exclusive property of [LEGAL ENTITY NAME]. Your use of the Services grants you a limited, non-exclusive license to use these tools—not ownership of them.
+          The &quot;Quilora&quot; name, logo, UI design, and underlying algorithms are the exclusive property of Quilora and its operator. Your use of the Services grants you a limited, non-exclusive license to use these tools—not ownership of them.
         </LegalParagraph>
       </LegalSectionCard>
 
@@ -127,13 +135,13 @@ export function TermsOfServiceBody() {
       <LegalSectionCard id="section-12" title="12. DISPUTE RESOLUTION &amp; GOVERNING LAW">
         <LegalBulletList>
           <li>
-            <strong>Informal Resolution:</strong> You agree to attempt to resolve any disputes informally by contacting [support@quilora.com].
+            <strong>Informal resolution:</strong> You agree to attempt to resolve any disputes informally by contacting <strong>info.quilora.ai@gmail.com</strong>.
           </li>
           <li>
-            <strong>Governing Law:</strong> These Terms are governed by the laws of <strong>[BOSNIA AND HERZEGOVINA]</strong>.
+            <strong>Governing law:</strong> These Terms are governed by the laws of <strong>Bosnia and Herzegovina</strong>.
           </li>
           <li>
-            <strong>Jurisdiction:</strong> Any legal action shall be brought in the courts of [CITY/REGION, BOSNIA AND HERZEGOVINA], except where mandatory consumer laws require otherwise.
+            <strong>Jurisdiction:</strong> Any legal action shall be brought in the courts of <strong>Sarajevo, Bosnia and Herzegovina</strong>, except where mandatory consumer laws require otherwise.
           </li>
         </LegalBulletList>
       </LegalSectionCard>
@@ -141,7 +149,10 @@ export function TermsOfServiceBody() {
       <LegalSectionCard id="section-13" title="13. CONTACT US">
         <LegalParagraph>For questions regarding these Terms, please contact:</LegalParagraph>
         <LegalParagraph>
-          <strong>Email:</strong> [support@quilora.com] <strong>Legal Address:</strong> [REGISTERED ADDRESS]
+          <strong>Email:</strong> info.quilora.ai@gmail.com
+        </LegalParagraph>
+        <LegalParagraph>
+          <strong>Registered address:</strong> Nerkeza Smailagića 11, Sarajevo, Bosnia and Herzegovina
         </LegalParagraph>
       </LegalSectionCard>
     </>

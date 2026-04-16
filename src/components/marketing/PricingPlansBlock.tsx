@@ -16,6 +16,7 @@ import { assertPrelaunchCheckoutAllowed } from '../../lib/prelaunchPurchaseGuard
 import { markBookwormPlanSelectedForCurrentUser } from '../../lib/markPlanSelection';
 import { safeInternalPath } from '../../lib/safeInternalPath';
 import { DuplicatePrelaunchPurchaseModal } from '../prelaunch/DuplicatePrelaunchPurchaseModal';
+import { ScrollReveal } from '../ScrollReveal';
 
 export type PricingPlansBlockProps = {
   /** Early access: Monthly/Yearly toggle and plan cards only (no genesis banner, tax line, comparison table). */
@@ -162,6 +163,11 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
+    if (user && !user.emailConfirmed) {
+      toast.error('Please verify your email before checkout.');
+      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
+      return;
+    }
     const checkoutUserId = user?.id ?? 'guest';
     const checkoutEmail = user?.email;
     const gate = user ? assertPrelaunchCheckoutAllowed(user, 'bookworm') : { ok: true };
@@ -190,9 +196,14 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, completedOpt, onCheckoutCompleted]);
+  }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
 
   const lockEarlySage = useCallback(async () => {
+    if (user && !user.emailConfirmed) {
+      toast.error('Please verify your email before checkout.');
+      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
+      return;
+    }
     const checkoutUserId = user?.id ?? 'guest';
     const checkoutEmail = user?.email;
     const gate = user ? assertPrelaunchCheckoutAllowed(user, 'sage') : { ok: true };
@@ -221,7 +232,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, completedOpt, onCheckoutCompleted]);
+  }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
 
   const claimGenesisSeatEarly = useCallback(() => {
     if (!user?.id) {
@@ -261,7 +272,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     return (
       <>
         {dupModalEl}
-        <div className="mb-12 flex flex-col items-center gap-3">
+        <div className="mb-10 flex flex-col items-center gap-4 md:mb-14 md:gap-5">
           <div
             className="relative grid w-56 grid-cols-2 rounded-full border border-white/10 bg-[#1a2f45]/50 p-1"
             role="group"
@@ -300,23 +311,19 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
           >
             <span className="text-sm font-semibold text-[#266ba7]">Save 50%</span>
           </div>
+          <div className="flex justify-center pt-0.5">
+            <span
+              className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-white/10 bg-[#1a2f45]/25 px-2.5 py-1 text-[11px] font-medium text-white/40"
+              title="1 credit ≈ 1 AI interaction. Amounts shown are monthly credit pools."
+            >
+              <Info className="h-3 w-3 shrink-0 text-[#7bbdf3]/70" aria-hidden />
+              Credit guide
+            </span>
+          </div>
         </div>
 
-        <div className="mb-8 flex flex-wrap items-center justify-center gap-3">
-          <span className="rounded-full border border-white/10 bg-[#1a2f45]/60 px-4 py-2 text-xs font-medium text-white/70">
-            200 seats only. Ever.
-          </span>
-          <span
-            className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-white/10 bg-[#1a2f45]/40 px-3 py-1.5 text-xs text-white/55"
-            title="1 credit ≈ 1 AI interaction. Amounts shown are monthly credit pools."
-          >
-            <Info className="h-3.5 w-3.5 shrink-0 text-[#7bbdf3]/90" aria-hidden />
-            Credit guide
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:items-stretch">
-          <div className="flex h-full min-h-0 animate-fade-in-up flex-col" style={{ animationDelay: '0ms' }}>
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:items-stretch md:gap-10 lg:gap-12">
+          <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0} className="flex h-full min-h-0 flex-col">
             <div className="flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#266ba7]/40 hover:shadow-[0_24px_48px_-12px_rgba(38,107,167,0.28)]">
               <div className="mb-6">
                 <h3 className="mb-1 text-2xl font-bold text-white">Bookworm</h3>
@@ -376,9 +383,9 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
                 </button>
               </div>
             </div>
-          </div>
+          </ScrollReveal>
 
-          <div className="flex h-full min-h-0 animate-fade-in-up flex-col" style={{ animationDelay: '75ms' }}>
+          <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0.06} className="flex h-full min-h-0 flex-col">
             <div className="flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#3b82c4] bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] p-8 shadow-2xl shadow-[#266ba7]/30 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_28px_56px_-12px_rgba(38,107,167,0.38)]">
               <div className="mb-6">
                 <h3 className="mb-1 text-2xl font-bold text-white">Sage</h3>
@@ -438,16 +445,22 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
                 </button>
               </div>
             </div>
-          </div>
+          </ScrollReveal>
 
-          <div className="flex h-full min-h-0 animate-fade-in-up flex-col" style={{ animationDelay: '150ms' }}>
+          <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0.12} className="flex h-full min-h-0 flex-col">
             <div className="flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#266ba7]/50 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#7bbdf3]/45 hover:shadow-[0_24px_48px_-12px_rgba(123,189,243,0.18)]">
               <div className="mb-6">
                 <h3 className="mb-1 text-2xl font-bold text-white">Lifetime Deal</h3>
               </div>
-              <div className="mb-6 space-y-4">
-                <p className="text-base font-semibold leading-snug text-white">$80 · First 50 seats</p>
-                <p className="text-base font-semibold leading-snug text-white">$119 · Remaining 150 seats</p>
+              <div className="mb-6 space-y-3">
+                <p className="flex flex-wrap items-baseline gap-2 leading-tight">
+                  <span className="text-5xl font-bold tracking-tight text-white">$80</span>
+                  <span className="text-sm font-medium text-white/45">· First 50 seats</span>
+                </p>
+                <p className="flex flex-wrap items-baseline gap-2 leading-tight">
+                  <span className="text-5xl font-bold tracking-tight text-white">$119</span>
+                  <span className="text-sm font-medium text-white/45">· Remaining 150 seats</span>
+                </p>
                 <p className="pt-1 text-lg font-bold leading-snug text-white">
                   {seatsRemaining != null ? `${seatsRemaining} seats remaining` : (
                     <span className="text-base font-semibold text-white/55">Loading seats…</span>
@@ -495,10 +508,10 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
                 </button>
               </div>
             </div>
-          </div>
+          </ScrollReveal>
         </div>
 
-        <p className="mx-auto mt-10 max-w-3xl text-center text-xs leading-relaxed text-white/45 sm:text-sm">
+        <p className="mx-auto mt-14 max-w-3xl text-center text-xs leading-relaxed text-white/45 sm:mt-16 sm:text-sm md:mt-20">
           Monthly plans: first month charged today at the pre-launch rate · renews monthly at the standard rate after.
           Annual plans: full year charged upfront today at 50% off · renews annually at the standard rate after year 1.
           Lifetime Deal: one-time payment today. If we don&apos;t launch within 90 days of your purchase, you get a full

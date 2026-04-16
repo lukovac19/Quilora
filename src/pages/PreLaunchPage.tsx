@@ -32,7 +32,8 @@ export function PreLaunchPage() {
   useEffect(() => {
     if (authLoading) return;
     if (user?.emailConfirmed) {
-      navigate('/dashboard', { replace: true });
+      // AUTH-10: returning verified users skip splash → pre-launch pricing / account path (not raw canvas).
+      navigate('/early-access', { replace: true });
     }
   }, [authLoading, user?.emailConfirmed, navigate]);
 
@@ -43,7 +44,9 @@ export function PreLaunchPage() {
       <main className="flex-1 px-4 pb-16 pt-40 sm:px-6 sm:pb-20 sm:pt-44 md:pt-48 lg:pt-52">
         <div className="mx-auto max-w-5xl space-y-6 text-center sm:space-y-8">
           <div className="animate-fade-in-up space-y-6 sm:space-y-8">
-            <h1 className="quilora-heading-hero mx-auto max-w-4xl font-bold leading-tight text-white">Quote Quest is evolving into Quilora</h1>
+            <h1 className="quilora-heading-hero mx-auto max-w-4xl font-bold leading-tight text-white">
+              Quote Quest is evolving into Quilora
+            </h1>
 
             <p className="quilora-subhead mx-auto max-w-3xl text-base leading-relaxed text-white/60 sm:text-lg lg:text-2xl">
               The AI tool that let you ask anything about your books is growing into something bigger — something &apos;Infinite&apos;
@@ -68,7 +71,7 @@ export function PreLaunchPage() {
           </div>
         </div>
 
-        <div className="mx-auto mt-10 w-full max-w-6xl sm:mt-12">
+        <div className="mx-auto mt-20 w-full max-w-6xl sm:mt-24 md:mt-28">
           <ScrollReveal delay={0} duration={0.5} yOffset={18}>
             <h2 className="quilora-heading-section mb-8 text-center font-bold text-white sm:mb-10">
               Built for readers, loved by our pioneering users

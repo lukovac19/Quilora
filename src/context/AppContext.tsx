@@ -369,7 +369,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
     localStorage.removeItem('qq_user');
     try {
       localStorage.removeItem('quilora_sandboxes');
@@ -378,6 +377,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    setUser(null);
   };
 
   const value: AppContextType = {

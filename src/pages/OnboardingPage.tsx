@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import { BookOpen, ArrowRight, Check } from 'lucide-react';
 import { useApp, type User } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
-import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 
 /** Pre-launch onboarding v4 — persisted JSON (flow doc Phase 3C). */
 export interface QuiloraOnboardingV4 {
@@ -391,7 +390,6 @@ export function OnboardingPage() {
           </div>
         </div>
       </div>
-      <QuiloraSiteFooter />
     </div>
   );
 }

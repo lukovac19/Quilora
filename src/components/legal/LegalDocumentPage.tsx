@@ -54,6 +54,8 @@ export function LegalDocumentPage({
   heroSubtitle,
   toc,
   children,
+  /** Slightly wider vertical rhythm between section cards (e.g. long-form Terms). */
+  articleInnerClassName = 'gap-6 sm:gap-8',
 }: {
   title: string;
   lastUpdatedLine: string;
@@ -61,6 +63,7 @@ export function LegalDocumentPage({
   heroSubtitle?: string;
   toc: LegalTocItem[];
   children: ReactNode;
+  articleInnerClassName?: string;
 }) {
   const selectId = useId();
   const scrollToId = (id: string) => {
@@ -97,7 +100,7 @@ export function LegalDocumentPage({
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
             <div className="order-2 min-w-0 flex-1 lg:order-2">
               <article className={articleShellClass}>
-                <div className="flex flex-col gap-6 sm:gap-8">{children}</div>
+                <div className={`flex flex-col ${articleInnerClassName}`}>{children}</div>
               </article>
             </div>
 

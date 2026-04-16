@@ -20,10 +20,11 @@ const TOC: LegalTocItem[] = [
 export function TermsPage() {
   return (
     <LegalDocumentPage
-      title="Terms of Service"
-      lastUpdatedLine="Last updated: April 14, 2026"
+      title="Terms & Conditions"
+      lastUpdatedLine="Last updated: April 17, 2026"
       heroSubtitle="The plain-English version lives in the product — this page is the formal agreement that keeps everyone safe."
       toc={TOC}
+      articleInnerClassName="gap-8 sm:gap-10"
     >
       <TermsOfServiceBody />
     </LegalDocumentPage>

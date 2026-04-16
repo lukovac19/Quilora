@@ -54,6 +54,7 @@ import { ContactPage } from "./pages/ContactPage";
 import { PrivacyPage } from "./pages/PrivacyPage";
 import { TermsPage } from "./pages/TermsPage";
 import { PaymentTermsPage } from "./pages/PaymentTermsPage";
+import { RefundPolicyPage } from "./pages/RefundPolicyPage";
 import { PreLaunchPage } from "./pages/PreLaunchPage";
 import { PreLaunchEarlyAccessPage } from "./pages/PreLaunchEarlyAccessPage";
 import { GenesisChoicePage } from "./pages/GenesisChoicePage";
@@ -137,6 +138,10 @@ export const router = createBrowserRouter([
       { 
         path: "terms", 
         Component: TermsPage 
+      },
+      {
+        path: "refund-policy",
+        Component: RefundPolicyPage,
       },
       {
         path: "payments",

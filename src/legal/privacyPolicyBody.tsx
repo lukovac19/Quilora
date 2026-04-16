@@ -66,7 +66,7 @@ export function PrivacyPolicyBody() {
 
       <LegalSectionCard id="section-10" title="Section 10 — Contact Us">
         <LegalParagraph>
-          Questions about privacy? Email <strong>support@quilora.ai</strong> and we will help.
+          Questions about privacy? Email <strong>info.quilora.ai@gmail.com</strong> and we will help.
         </LegalParagraph>
       </LegalSectionCard>
     </>

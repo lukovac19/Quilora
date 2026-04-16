@@ -18,7 +18,7 @@ export function PrivacyPage() {
   return (
     <LegalDocumentPage
       title="Privacy Policy"
-      lastUpdatedLine="Last updated: April 14, 2026"
+      lastUpdatedLine="Last updated: April 17, 2026"
       heroSubtitle="We collect only what we need to run Quilora well, and we are careful with what you trust us with."
       toc={TOC}
     >

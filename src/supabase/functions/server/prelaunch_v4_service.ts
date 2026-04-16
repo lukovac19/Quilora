@@ -72,6 +72,7 @@ export async function validatePassthroughForCheckout(
   if (!token) return { ok: true };
   const { data } = await admin.from('checkout_passthrough').select('*').eq('token', token).maybeSingle();
   if (!data) return { ok: false, error: 'INVALID_PASSTHROUGH' };
+  if (data.consumed_at) return { ok: false, error: 'PASSTHROUGH_ALREADY_USED' };
   if (String(data.user_id) !== userId) return { ok: false, error: 'INVALID_PASSTHROUGH' };
   if (new Date(String(data.expires_at)).getTime() < Date.now()) return { ok: false, error: 'PASSTHROUGH_EXPIRED' };
   const expected = String(data.expected_checkout_email ?? '').toLowerCase();
@@ -79,6 +80,50 @@ export async function validatePassthroughForCheckout(
   if (bill && expected && bill !== expected) {
     return { ok: false, error: 'EMAIL_MISMATCH_CHECKOUT' };
   }
+  return { ok: true };
+}
+
+/** Single-use checkout binding (EC-05) — call after successful `transaction.completed` handling. */
+export async function consumeCheckoutPassthrough(admin: SupabaseClient, token: string | undefined) {
+  if (!token) return;
+  await admin
+    .from('checkout_passthrough')
+    .update({ consumed_at: new Date().toISOString() })
+    .eq('token', token)
+    .is('consumed_at', null);
+}
+
+/**
+ * PAY-09 / EC-09 — last-line duplicate guard on the server (client already blocks most cases).
+ * Rejects clearly conflicting Paddle completions for the same Supabase user.
+ */
+export async function assertPrelaunchWebhookPurchaseAllowed(
+  admin: SupabaseClient,
+  userId: string,
+  productKind: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const profile = await getProfile(admin, userId);
+  const tier = String(profile?.tier ?? 'bookworm');
+  const firstAt = profile?.first_prelaunch_purchase_at as string | undefined;
+
+  if (productKind === 'genesis_80' || productKind === 'genesis_119') {
+    if (tier === 'genesis') return { ok: false, error: 'DUPLICATE_GENESIS' };
+    return { ok: true };
+  }
+
+  if (productKind.startsWith('bibliophile')) {
+    // Genesis + 1Y Sage bundle is still two Paddle checkouts in the client — allow Sage after Genesis seat.
+    if (tier === 'genesis') return { ok: true };
+    if (tier === 'bibliophile' && firstAt) return { ok: false, error: 'DUPLICATE_SAGE' };
+    return { ok: true };
+  }
+
+  if (productKind.startsWith('bookworm')) {
+    if (tier === 'bibliophile' || tier === 'genesis') return { ok: false, error: 'BLOCK_BW_HIGHER_TIER' };
+    if (tier === 'bookworm' && firstAt) return { ok: false, error: 'DUPLICATE_BOOKWORM' };
+    return { ok: true };
+  }
+
   return { ok: true };
 }
 
@@ -587,6 +632,22 @@ export async function cancelGenesisReleaseSeat(admin: SupabaseClient, userId: st
   const row = await getProfile(admin, userId);
   const pp = (row?.genesis_slot_price_point as string) || '80';
   await releaseGenesisSlot(admin, pp === '119' ? 'genesis_119' : 'genesis_80');
+
+  const { data: genesisTxs } = await admin
+    .from('paddle_transactions')
+    .select('paddle_transaction_id, product_kind')
+    .eq('user_id', userId)
+    .in('product_kind', ['genesis_80', 'genesis_119'])
+    .not('paddle_transaction_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(3);
+  for (const t of genesisTxs ?? []) {
+    const pid = String((t as { paddle_transaction_id?: string }).paddle_transaction_id ?? '');
+    if (pid) {
+      await attemptRefundRecorded(admin, pid, 'ec07_genesis_seat_release');
+    }
+  }
+
   await setTier(admin, userId, 'bookworm');
   await admin
     .from('profiles')

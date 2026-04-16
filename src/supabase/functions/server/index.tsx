@@ -26,8 +26,10 @@ import {
 } from './paddle_service.ts';
 import {
   adminLinkOrphanPayment,
+  assertPrelaunchWebhookPurchaseAllowed,
   cancelGenesisReleaseSeat,
   cancelPrelaunchBookwormSage,
+  consumeCheckoutPassthrough,
   createCheckoutPassthrough,
   enqueueEmail,
   getPublicLaunchComplete,
@@ -945,6 +947,21 @@ app.post('/make-server-5a3d4811/payments/paddle/webhook', async (c) => {
     if (eventType === 'transaction.completed') {
       const productKind = String(metadata['productKind'] ?? '');
       if (!productKind) return c.json({ error: 'Missing productKind in custom_data' }, 400);
+      const passthroughToken =
+        typeof metadata['passthroughToken'] === 'string' ? metadata['passthroughToken'].trim() : undefined;
+      if (Deno.env.get('REQUIRE_CHECKOUT_PASSTHROUGH') === 'true' && !passthroughToken) {
+        return c.json({ error: 'Missing passthroughToken in custom_data' }, 400);
+      }
+      const passVal = await validatePassthroughForCheckout(supabase, passthroughToken, userId, customerEmail);
+      if (!passVal.ok) {
+        console.warn('checkout passthrough rejected', passVal.error, { userId, providerEventId });
+        return c.json({ error: passVal.error }, 400);
+      }
+      const dup = await assertPrelaunchWebhookPurchaseAllowed(supabase, userId, productKind);
+      if (!dup.ok) {
+        console.warn('duplicate prelaunch purchase blocked', dup.error, { userId, productKind, providerEventId });
+        return c.json({ error: dup.error }, 409);
+      }
       await handleTransactionCompleted(supabase, {
         userId,
         productKind,
@@ -954,6 +971,7 @@ app.post('/make-server-5a3d4811/payments/paddle/webhook', async (c) => {
         paddleCustomerId,
         rawCustom: metadata,
       });
+      await consumeCheckoutPassthrough(supabase, passthroughToken);
     }
 
     if (eventType === 'subscription.created' || eventType === 'subscription.updated') {
