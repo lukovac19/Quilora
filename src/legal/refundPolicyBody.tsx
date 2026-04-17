@@ -66,7 +66,7 @@ export function RefundPolicyBody() {
 
       <LegalSectionCard id="section-10" title="Section 10 — Contact">
         <LegalParagraph>
-          Refund and billing questions: <strong>info.quilora.ai@gmail.com</strong>
+          Refund and billing questions: <strong>support@quilora.com</strong>
         </LegalParagraph>
         <LegalParagraph>
           Paddle support (payment and receipt issues):{' '}

@@ -46,7 +46,7 @@ export function TermsOfServiceBody() {
           <li>Maintain the security of your password.</li>
           <li>Accept responsibility for all activities occurring under your account.</li>
           <li>
-            Notify us immediately at <strong>info.quilora.ai@gmail.com</strong> of any unauthorized access.
+            Notify us immediately at <strong>support@quilora.com</strong> of any unauthorized access.
           </li>
         </LegalBulletList>
       </LegalSectionCard>
@@ -135,7 +135,7 @@ export function TermsOfServiceBody() {
       <LegalSectionCard id="section-12" title="12. DISPUTE RESOLUTION &amp; GOVERNING LAW">
         <LegalBulletList>
           <li>
-            <strong>Informal resolution:</strong> You agree to attempt to resolve any disputes informally by contacting <strong>info.quilora.ai@gmail.com</strong>.
+            <strong>Informal resolution:</strong> You agree to attempt to resolve any disputes informally by contacting <strong>support@quilora.com</strong>.
           </li>
           <li>
             <strong>Governing law:</strong> These Terms are governed by the laws of <strong>Bosnia and Herzegovina</strong>.
@@ -149,7 +149,7 @@ export function TermsOfServiceBody() {
       <LegalSectionCard id="section-13" title="13. CONTACT US">
         <LegalParagraph>For questions regarding these Terms, please contact:</LegalParagraph>
         <LegalParagraph>
-          <strong>Email:</strong> info.quilora.ai@gmail.com
+          <strong>Email:</strong> support@quilora.com
         </LegalParagraph>
         <LegalParagraph>
           <strong>Registered address:</strong> Nerkeza Smailagića 11, Sarajevo, Bosnia and Herzegovina

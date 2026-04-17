@@ -3,24 +3,15 @@ import { useNavigate } from 'react-router';
 import type { CheckoutProductKey } from '../lib/billingCheckout';
 import { useTranslation } from '../lib/translations';
 import { useApp } from '../context/AppContext';
-import {
-  BookOpen,
-  MessageSquare,
-  Sparkles,
-  Upload,
-  FileText,
-  Search,
-  Zap,
-  ArrowRight,
-  Star,
-  Play,
-} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { LayoutGrid, BookOpen, Target, StickyNote, ArrowRight, Star, Play } from 'lucide-react';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 import { FAQAccordion } from '../components/FAQAccordion';
 import { getThemeColors } from '../lib/theme';
 import { ScrollReveal } from '../components/ScrollReveal';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
+import { HOW_IT_WORKS_STEP_IMAGE_SRCS } from '../lib/howItWorksStepMedia';
 
 export function QuiloraLandingPage() {
   const { t } = useTranslation();
@@ -35,43 +26,56 @@ export function QuiloraLandingPage() {
     navigate('/auth?mode=signup');
   };
 
-  const features = [
+  const features: {
+    icon: LucideIcon;
+    iconClass: string;
+    title: string;
+    description: string;
+  }[] = [
     {
-      icon: Search,
-      title: 'Quote Extraction',
-      description: 'Instantly find and save meaningful quotes from any book with AI-powered search'
+      icon: LayoutGrid,
+      iconClass: 'text-emerald-300/90',
+      title: 'Infinite Canvas',
+      description:
+        'Build your understanding visually by connecting ideas, insights, and evidence into a structured knowledge map.',
     },
     {
-      icon: MessageSquare,
-      title: 'Character Analysis',
-      description: 'Deep dive into character development, motivations, and relationships'
+      icon: BookOpen,
+      iconClass: 'text-violet-300/90',
+      title: 'Reader',
+      description:
+        'Turn any text into usable insights with highlights, AI explanations, and instant transfer to your canvas.',
     },
     {
-      icon: Sparkles,
-      title: 'AI Question Generation',
-      description: 'Generate thoughtful discussion questions to deepen your understanding'
+      icon: Target,
+      iconClass: 'text-orange-300/90',
+      title: 'Mastery',
+      description:
+        'Test and validate your understanding with source-grounded assessments that reveal real comprehension gaps.',
     },
     {
-      icon: FileText,
-      title: 'Essay Support',
-      description: 'Get structured outlines and insights to enhance your writing'
-    }
+      icon: StickyNote,
+      iconClass: 'text-amber-300/90',
+      title: 'Notes',
+      description:
+        'Capture and organize thoughts in a simple, linear workspace before turning them into structured knowledge.',
+    },
   ];
 
   const steps = [
     {
-      stepLabel: 'Step 1',
-      subhead: 'Create Your Sandbox',
+      titleLine: 'Step 1: Create your Sandbox',
+      imageSrc: HOW_IT_WORKS_STEP_IMAGE_SRCS[0],
       body: 'Start with a topic, a book, a subject, or a theme. Quilora gives you an open space like a sandbox — an infinite canvas where your ideas take shape.',
     },
     {
-      stepLabel: 'Step 2',
-      subhead: 'Connect the Dots',
+      titleLine: 'Step 2: Connect the Dots',
+      imageSrc: HOW_IT_WORKS_STEP_IMAGE_SRCS[1],
       body: 'Use nodes to break down ideas, connect concepts, and map relationships in a visual layout that works the way your mind does.',
     },
     {
-      stepLabel: 'Step 3',
-      subhead: 'Read, Explore, and Go Deeper',
+      titleLine: 'Step 3: Read, Explore, and Go Deeper',
+      imageSrc: HOW_IT_WORKS_STEP_IMAGE_SRCS[2],
       body: 'Switch between Reading Mode and Mastery Mode as you go deeper into your material, test your subject, and challenge yourself — all without leaving your flow.',
     },
   ];
@@ -165,7 +169,7 @@ export function QuiloraLandingPage() {
         <div className="container mx-auto max-w-6xl">
           <div className="mb-12 text-center sm:mb-16">
             <h2 className="quilora-heading-section px-1 font-bold text-white sm:px-0">
-              There's no replacement to reading, but if you want mastery, Quilora provides the depth you seek
+              There&apos;s no replacement to reading, but if you want mastery, Quilora provides the depth you seek
             </h2>
           </div>
 
@@ -176,9 +180,11 @@ export function QuiloraLandingPage() {
                 className="group p-6 rounded-3xl bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] border border-white/5 hover:border-[#266ba7]/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-[#266ba7]/10 animate-fade-in-up"
                 style={{ animationDelay: `${index * 75}ms` }}
               >
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                  <feature.icon className="w-6 h-6 text-white" />
-                </div>
+                <feature.icon
+                  className={`mb-4 h-7 w-7 transition-opacity duration-300 group-hover:opacity-100 ${feature.iconClass} opacity-90`}
+                  strokeWidth={1.5}
+                  aria-hidden
+                />
                 <h3 className="text-lg font-semibold text-white mb-2">
                   {feature.title}
                 </h3>
@@ -218,25 +224,14 @@ export function QuiloraLandingPage() {
                     duration={0.55}
                   >
                     <p className="text-2xl lg:text-3xl font-bold text-[#266ba7]">
-                      {step.stepLabel}
-                    </p>
-                  </ScrollReveal>
-                  <ScrollReveal
-                    xOffset={-28}
-                    yOffset={0}
-                    scale={1}
-                    delay={0.14}
-                    duration={0.55}
-                  >
-                    <p className="text-lg lg:text-xl font-medium text-white">
-                      {step.subhead}
+                      {step.titleLine}
                     </p>
                   </ScrollReveal>
                   <ScrollReveal
                     xOffset={-24}
                     yOffset={0}
                     scale={1}
-                    delay={0.22}
+                    delay={0.18}
                     duration={0.55}
                   >
                     <p className="text-base font-normal leading-relaxed text-white/60">
@@ -252,21 +247,14 @@ export function QuiloraLandingPage() {
                   delay={0.08}
                   duration={0.55}
                 >
-                  <div
-                    className="min-h-[200px] md:min-h-[220px] rounded-2xl flex flex-col items-center justify-center gap-4 px-6 py-10 bg-[#266ba7]/20 border border-[#266ba7]/25"
-                    role="img"
-                    aria-label="Video placeholder"
-                  >
-                    <div className="w-14 h-14 rounded-full bg-[#266ba7]/35 flex items-center justify-center">
-                      <Play
-                        className="w-7 h-7 text-[#266ba7]"
-                        strokeWidth={2}
-                        fill="currentColor"
-                      />
-                    </div>
-                    <p className="text-base font-medium text-white/80">
-                      Video Placeholder
-                    </p>
+                  <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-[0_20px_50px_-24px_rgba(0,0,0,0.45)]">
+                    <img
+                      src={step.imageSrc}
+                      alt=""
+                      className="block w-full object-cover object-top"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </div>
                 </ScrollReveal>
               </div>
@@ -284,7 +272,7 @@ export function QuiloraLandingPage() {
         <div className="relative container mx-auto max-w-6xl">
           <ScrollReveal delay={0} duration={0.5} yOffset={18}>
             <h2 className="quilora-heading-section mb-10 text-center font-bold text-white sm:mb-12">
-              From our pioneering users
+              Built for readers, loved by our pioneering users
             </h2>
           </ScrollReveal>
 
@@ -363,16 +351,16 @@ export function QuiloraLandingPage() {
 
             <div className="relative flex flex-col items-center space-y-5 text-center sm:space-y-6">
               <h2 className="quilora-heading-section font-bold text-white">
-                Master the depth of every story
+                Your reading list deserves more than a checkmark
               </h2>
               <p className="mx-auto max-w-2xl text-base text-white/80 sm:text-lg lg:text-xl">
-                Join our growing list of learners who use Quilora to reimagine the study process for literature, narratives, and books
+                Join a growing list of readers who use Quilora to go deeper into everything they read.
               </p>
               <button
                 onClick={handleGetStarted}
                 className="group mx-auto flex min-h-11 w-full max-w-sm items-center justify-center gap-2 rounded-full bg-white px-8 py-3.5 text-base font-semibold text-[#266ba7] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-2xl sm:w-auto sm:py-4"
               >
-                Get Started Free
+                Get Started
                 <ArrowRight className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
               </button>
             </div>

@@ -1,8 +1,10 @@
 import { Link, useNavigate } from 'react-router';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
+import { QuiloraNavLogoLink } from '../components/QuiloraNavLogoLink';
 import { useApp } from '../context/AppContext';
 import { useState, useEffect } from 'react';
-import { BookOpen, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import { HOW_IT_WORKS_STEP_IMAGE_SRCS, HOW_IT_WORKS_STEP_LABELS } from '../lib/howItWorksStepMedia';
 
 export function HowItWorksPage() {
   const { user } = useApp();
@@ -35,15 +37,7 @@ export function HowItWorksPage() {
         <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             {/* Logo */}
-            <Link
-              to="/"
-              className="flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-90"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-white">Quilora</span>
-            </Link>
+            <QuiloraNavLogoLink />
 
             {/* Desktop Navigation - Centered */}
             <div className="hidden flex-1 items-center justify-center gap-8 md:flex">
@@ -200,13 +194,13 @@ export function HowItWorksPage() {
           </div>
 
           <div className="mx-auto mt-16 flex max-w-3xl flex-col items-center gap-12 md:mt-20 md:gap-16">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className="aspect-[4/3] w-full max-w-2xl rounded-3xl border border-[#266ba7]/20 bg-gradient-to-br from-[#1a2f45]/70 via-[#132842]/85 to-[#0a1929] shadow-[0_24px_60px_-28px_rgba(38,107,167,0.35)] ring-1 ring-white/5"
-                role="img"
-                aria-label={`Video or animation placeholder ${i + 1} of 3`}
-              />
+            {HOW_IT_WORKS_STEP_IMAGE_SRCS.map((src, i) => (
+              <div key={src} className="w-full max-w-2xl space-y-3">
+                <p className="text-center text-lg font-semibold text-[#266ba7] md:text-xl">{HOW_IT_WORKS_STEP_LABELS[i]}</p>
+                <div className="overflow-hidden rounded-3xl border border-[#266ba7]/20 bg-[#0a1929]/40 shadow-[0_24px_60px_-28px_rgba(38,107,167,0.35)] ring-1 ring-white/5">
+                  <img src={src} alt="" className="block w-full object-cover object-top" loading="lazy" decoding="async" />
+                </div>
+              </div>
             ))}
           </div>
         </div>

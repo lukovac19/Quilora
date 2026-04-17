@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import {
-  BookOpen,
   Home,
   FileText,
   Bookmark,
@@ -295,9 +294,7 @@ export function DashboardPage() {
           <div className="p-6 border-b border-white/5">
             <div className="flex items-center justify-between">
               <a href="/" className="flex items-center gap-2 transition-opacity hover:opacity-90">
-                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                  <BookOpen className="w-5 h-5 text-white" />
-                </div>
+                <img src="/quilora-logo-icon.png" alt="" className="h-10 w-10 shrink-0 object-contain" width={40} height={40} />
                 <span className="text-xl font-semibold text-white">Quilora</span>
               </a>
               <button 

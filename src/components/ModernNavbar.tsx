@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router';
 import { useApp } from '../context/AppContext';
 import { useTranslation, t } from '../lib/translations';
-import { ChevronDown, User, LogOut, Settings, BookOpen } from 'lucide-react';
+import { ChevronDown, User, LogOut, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { getThemeColors } from '../lib/theme';
 import {
@@ -85,24 +85,13 @@ export function ModernNavbar({ appearance = 'default', variant = 'default' }: Mo
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className={`group ml-2 flex items-center gap-3 ${isAuthNav ? 'shrink-0' : 'min-w-0 shrink-0 md:min-w-0'}`}>
-            {isAuthNav ? (
-              <img
-                src="/quilora-logo-icon.png"
-                alt=""
-                className="h-10 w-10 shrink-0 object-contain"
-                width={40}
-                height={40}
-              />
-            ) : (
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200 group-hover:shadow-lg"
-                style={{
-                  background: `linear-gradient(to bottom right, ${colors.accent}, ${colors.accentDark})`,
-                }}
-              >
-                <BookOpen className="h-6 w-6 text-white" />
-              </div>
-            )}
+            <img
+              src="/quilora-logo-icon.png"
+              alt=""
+              className="h-10 w-10 shrink-0 object-contain"
+              width={40}
+              height={40}
+            />
             <span
               className="text-2xl font-bold transition-colors duration-300"
               style={{ color: colors.text }}

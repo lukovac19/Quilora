@@ -1,5 +1,10 @@
 import { LegalDocumentPage, type LegalTocItem } from '../components/legal/LegalDocumentPage';
 import { PrivacyPolicyBody } from '../legal/privacyPolicyBody';
+import {
+  QUILORA_CONTACT_EMAIL,
+  QUILORA_EFFECTIVE_DATE_LINE,
+  QUILORA_POSTAL_ADDRESS,
+} from '../lib/siteContact';
 
 const TOC: LegalTocItem[] = [
   { id: 'section-1', label: 'Section 1 — Introduction' },
@@ -19,8 +24,10 @@ export function PrivacyPage() {
     <LegalDocumentPage
       title="Privacy Policy"
       lastUpdatedLine="Last updated: April 17, 2026"
+      effectiveDateLine={QUILORA_EFFECTIVE_DATE_LINE}
       heroSubtitle="We collect only what we need to run Quilora well, and we are careful with what you trust us with."
       toc={TOC}
+      contactFooter={{ email: QUILORA_CONTACT_EMAIL, address: QUILORA_POSTAL_ADDRESS }}
     >
       <PrivacyPolicyBody />
     </LegalDocumentPage>

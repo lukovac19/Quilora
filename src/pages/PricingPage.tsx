@@ -1,8 +1,9 @@
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
+import { QuiloraNavLogoLink } from '../components/QuiloraNavLogoLink';
 import { useApp } from '../context/AppContext';
 import { useState, useEffect, useCallback } from 'react';
-import { BookOpen, Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
+import { Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { openPaddleCheckout, type CheckoutProductKey } from '../lib/billingCheckout';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
@@ -22,29 +23,29 @@ export function PricingPage() {
 
   const faqs = [
     {
-      question: 'What are the limitations of the Free plan?',
+      question: 'What do I get with each plan?',
       answer:
-        'The Free plan allows 5 questions per session with a 4-hour cooldown period between sessions. You get basic AI analysis and quote extraction features.',
+        'Each plan gives you monthly AI credits and access to all core features, with higher tiers unlocking more credits and fewer limits on things like sandboxes and saved work.',
     },
     {
-      question: 'Can I upgrade or downgrade my plan at any time?',
+      question: 'What are credits and how do they work?',
       answer:
-        'Yes, you can upgrade or downgrade your subscription at any time. Changes take effect immediately for upgrades, and at the end of the billing period for downgrades.',
+        'Credits are only used for AI actions like analysis, prompts, and assessments—Canvas Mode and core features are fully included in all plans.',
     },
     {
-      question: 'How is Quilora different from ChatGPT or other AI chatbots?',
+      question: 'What happens if I run out of credits?',
       answer:
-        'Quilora is specifically designed for literature analysis with specialized features like character tracking, theme analysis, and quote extraction. Unlike general chatbots, it understands narrative structure and literary devices.',
+        'You can continue using non-AI features, or instantly top up with a Boost Pack to keep going without interruption.',
     },
     {
-      question: 'Can I save my insights and export them?',
+      question: 'Do unused credits roll over?',
       answer:
-        'Standard and Pro plans allow you to save insights. Pro users can export their analysis to PDF format for essays and presentations.',
+        'Credits only roll over on the Sage plan (and future higher tiers), so unused credits aren’t lost at the end of each billing cycle.',
     },
     {
-      question: 'Can I use Quilora for academic essays?',
+      question: 'Can I upgrade or downgrade anytime?',
       answer:
-        'Yes! Quilora provides essay support with structured outlines and insights. However, we recommend using it as a study aid and analysis tool, not as a replacement for your own critical thinking and writing.',
+        'Yes—you can switch plans anytime, and your work stays intact with changes applied immediately to your account.',
     },
   ];
 
@@ -114,12 +115,7 @@ export function PricingPage() {
       >
         <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-2">
-            <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-90">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-white">Quilora</span>
-            </Link>
+            <QuiloraNavLogoLink />
 
             <div className="hidden flex-1 items-center justify-center gap-8 md:flex">
               <Link to="/features" className="cursor-pointer text-base text-white/70 transition-colors duration-200 hover:text-white">
@@ -312,7 +308,7 @@ export function PricingPage() {
 
                 <div
                   className={`overflow-hidden transition-all duration-300 ${
-                    openFAQ === index ? 'max-h-96' : 'max-h-0'
+                    openFAQ === index ? 'max-h-[36rem]' : 'max-h-0'
                   }`}
                 >
                   <div className="px-6 pb-6 text-white/70 leading-relaxed">{faq.answer}</div>

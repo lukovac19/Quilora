@@ -51,18 +51,23 @@ export function LegalBulletList({ children }: { children: ReactNode }) {
 export function LegalDocumentPage({
   title,
   lastUpdatedLine,
+  effectiveDateLine,
   heroSubtitle,
   toc,
   children,
+  contactFooter,
   /** Slightly wider vertical rhythm between section cards (e.g. long-form Terms). */
   articleInnerClassName = 'gap-6 sm:gap-8',
 }: {
   title: string;
   lastUpdatedLine: string;
+  effectiveDateLine?: string;
   /** Optional inspiring line under the hero title */
   heroSubtitle?: string;
   toc: LegalTocItem[];
   children: ReactNode;
+  /** Shown once at the end of the article (must match site footer). */
+  contactFooter?: { email: string; address: string };
   articleInnerClassName?: string;
 }) {
   const selectId = useId();
@@ -90,8 +95,13 @@ export function LegalDocumentPage({
             <ScrollReveal delay={0.06} duration={0.5}>
               <p className="mt-3 text-sm font-medium text-[#7bbdf3]/90 sm:text-base">{lastUpdatedLine}</p>
             </ScrollReveal>
+            {effectiveDateLine ? (
+              <ScrollReveal delay={0.08} duration={0.5}>
+                <p className="mt-2 text-sm font-medium text-white/55 sm:text-base">{effectiveDateLine}</p>
+              </ScrollReveal>
+            ) : null}
             {heroSubtitle ? (
-              <ScrollReveal delay={0.1} duration={0.5}>
+              <ScrollReveal delay={0.12} duration={0.5}>
                 <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-white/60 sm:text-lg">{heroSubtitle}</p>
               </ScrollReveal>
             ) : null}
@@ -100,7 +110,25 @@ export function LegalDocumentPage({
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-10">
             <div className="order-2 min-w-0 flex-1 lg:order-2">
               <article className={articleShellClass}>
-                <div className={`flex flex-col ${articleInnerClassName}`}>{children}</div>
+                <div className={`flex flex-col ${articleInnerClassName}`}>
+                  {children}
+                  {contactFooter ? (
+                    <div
+                      className={`mt-8 border-t border-white/10 pt-8 sm:mt-10 ${bodyClass} [&_strong]:text-white/90`}
+                    >
+                      <p>
+                        <strong>Contact</strong>
+                      </p>
+                      <p className="mt-2">
+                        <a href={`mailto:${contactFooter.email}`}>{contactFooter.email}</a>
+                      </p>
+                      <p className="mt-6">
+                        <strong>Postal address</strong>
+                      </p>
+                      <p className="mt-2">{contactFooter.address}</p>
+                    </div>
+                  ) : null}
+                </div>
               </article>
             </div>
 

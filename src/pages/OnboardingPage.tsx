@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import { BookOpen, ArrowRight, Check } from 'lucide-react';
+import { ArrowRight, Check } from 'lucide-react';
 import { useApp, type User } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
 
@@ -157,9 +157,7 @@ export function OnboardingPage() {
       <div className="relative z-10 flex flex-1 flex-col items-center justify-center p-6">
         <div className="relative w-full max-w-xl">
           <div className="mb-8 flex items-center justify-center gap-2">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-              <BookOpen className="h-6 w-6 text-white" aria-hidden />
-            </div>
+            <img src="/quilora-logo-icon.png" alt="" className="h-12 w-12 shrink-0 object-contain" width={48} height={48} aria-hidden />
             <span className="text-2xl font-semibold text-white">Quilora</span>
           </div>
 

@@ -1,8 +1,9 @@
 import { Link, useNavigate } from 'react-router';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
+import { QuiloraNavLogoLink } from '../components/QuiloraNavLogoLink';
 import { useApp } from '../context/AppContext';
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Menu, X, Check, ChevronDown } from 'lucide-react';
+import { Menu, X, Check, ChevronDown } from 'lucide-react';
 
 type FeatureTab = 'deeper' | 'clarity' | 'progress';
 
@@ -46,29 +47,29 @@ const featurePanels: Record<
 
 const featuresPageFaq: { question: string; answer: string }[] = [
   {
-    question: 'What are nodes and how do I use them?',
+    question: 'What is Canvas Mode and why is it the core of the product?',
     answer:
-      'Nodes are the building blocks on your canvas—each one can hold an idea, a quote, a character beat, or a connection. Place them, link them, and arrange them so the map matches how you think about the text.',
+      'Canvas Mode is where all your understanding lives—you visually connect ideas, evidence, and insights, while using AI in a non-linear way to explore, prompt, and build deeper insights beyond simple chat.',
   },
   {
-    question: 'What is the difference between Canvass Mode and Reading Mode?',
+    question: 'Do I need to follow a specific workflow to use the app?',
     answer:
-      'Reading Mode keeps you anchored in the text for close reading and highlights. Canvass Mode opens the infinite canvas so you can lay out nodes spatially, compare ideas, and see the big picture at once.',
+      'No—Quilora is non-linear. You can start from reading, building on the canvas, or testing yourself, and everything stays connected.',
   },
   {
-    question: 'Can I highlight text in Reading Mode and send it to the canvas?',
+    question: 'What makes the AI responses reliable?',
     answer:
-      'Where the app supports it, you can capture a selection from Reading Mode and bring it onto the canvas as a node or attachment so evidence stays tied to your map.',
+      'Every AI output is tied to your source material through the Trust Factor system, ensuring responses are grounded, cited, and not generic.',
   },
   {
-    question: 'How does the AI Tutor Mode work?',
+    question: 'Will I lose my work when switching between modes?',
     answer:
-      'AI Tutor discusses your material with you, asks follow-ups, and explains concepts in context—helping you fill gaps after quizzes or when a topic still feels fuzzy.',
+      'No—your canvas, notes, and progress persist across all modes, so you can switch anytime without losing context.',
   },
   {
-    question: 'How does the Mastery Heatmap work?',
+    question: 'Do all features cost credits?',
     answer:
-      'It summarizes how well you have retained material across topics or sections—so you can see strengths at a glance and focus review where comprehension is thinner.',
+      'Only AI-powered actions use credits. Core actions like reading, highlighting, organizing, and connecting ideas are free or tier-based.',
   },
 ];
 
@@ -203,12 +204,7 @@ export function FeaturesPage() {
       >
         <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-2">
-            <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-90">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-white">Quilora</span>
-            </Link>
+            <QuiloraNavLogoLink />
 
             <div className="hidden md:flex items-center gap-8 flex-1 justify-center">
               {navLink('/features', 'Features', true)}
@@ -376,7 +372,7 @@ export function FeaturesPage() {
                 {panel.body}
               </p>
               <p className="mt-10 text-center text-xs font-semibold uppercase tracking-[0.14em] text-[#266ba7]/90">
-                Features to highlight
+                Features
               </p>
               <ul className="mx-auto mt-6 max-w-lg space-y-4">
                 {panel.bullets.map((line) => (
@@ -423,7 +419,7 @@ export function FeaturesPage() {
                 </button>
                 <div
                   className={`overflow-hidden transition-all duration-300 ${
-                    openFeatureFaq === index ? 'max-h-80' : 'max-h-0'
+                    openFeatureFaq === index ? 'max-h-[36rem]' : 'max-h-0'
                   }`}
                 >
                   <div className="px-6 pb-6 leading-relaxed text-white/70">{item.answer}</div>

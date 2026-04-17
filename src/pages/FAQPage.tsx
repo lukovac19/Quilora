@@ -1,8 +1,9 @@
 import { Link, useNavigate } from 'react-router';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
+import { QuiloraNavLogoLink } from '../components/QuiloraNavLogoLink';
 import { useApp } from '../context/AppContext';
 import { useState, useEffect, useRef } from 'react';
-import { BookOpen, Menu, X, ChevronDown } from 'lucide-react';
+import { Menu, X, ChevronDown } from 'lucide-react';
 
 type FaqCategory = 'general' | 'features' | 'pricing';
 
@@ -15,54 +16,29 @@ const FAQ_TABS: { id: FaqCategory; label: string }[] = [
 const faqByCategory: Record<FaqCategory, { question: string; answer: string }[]> = {
   general: [
     {
-      question: 'What is Quilora and how does it work?',
+      question: 'What is Quilora and who is it for?',
       answer:
-        'Quilora is an AI-powered workspace for deep reading: upload literature, use nodes and an infinite canvas to map ideas, and move between reading-focused and mastery workflows so themes, characters, and evidence stay connected to the text.',
+        'Quilora is an AI-powered learning platform for students, deep readers, and professionals who want to truly understand—not just skim—complex texts.',
     },
     {
-      question: 'How is Quilora different from ChatGPT or other AI chatbots?',
+      question: 'How is this different from note-taking apps or AI chat tools?',
       answer:
-        'General chatbots answer in isolation. Quilora is built around your book—nodes, canvas layout, reading mode, quizzes, and traceable quotes—so analysis stays grounded in what you are actually reading.',
+        'Quilora replaces linear chats with a creative canvas where you can combine prompts, connect ideas, and use AI in a non-linear way to build deeper insights.',
     },
     {
-      question: 'What formats do you support?',
+      question: 'Do I need technical skills to use this?',
       answer:
-        'You can work with PDFs and pasted text where the app supports them; additional formats may appear as we expand. Quilora is optimized for narrative and long-form literary material.',
+        'No—the interface is designed to be intuitive, so you can start reading, building, and exploring without any technical background.',
     },
     {
-      question: 'Is Quilora multilingual?',
+      question: 'Can I use my own materials?',
       answer:
-        'Yes, where enabled: you can use multiple interface languages in Settings, and the AI can often analyze sources and respond in more than one language depending on your content and plan.',
+        'Yes—you can upload PDFs, paste text, or use available content to build your own personalized knowledge system.',
     },
     {
-      question: 'How accurate is the AI analysis?',
+      question: 'Is this only for books and reading?',
       answer:
-        'Insights aim to cite the text you provide, but models can miss nuance. Treat Quilora as a study partner—cross-check important points against the source and your own judgment.',
-    },
-    {
-      question: 'Can I use Quilora on mobile?',
-      answer:
-        'You can use Quilora in the mobile browser where supported. Complex canvas work is most comfortable on a larger screen; check current device guidance in-app.',
-    },
-    {
-      question: 'Is my data secure on Quilora?',
-      answer:
-        'We apply standard protections for accounts and uploads. Review our Privacy Policy for retention, subprocessors, and what you can delete; avoid uploading highly sensitive personal data unless you accept those terms.',
-    },
-    {
-      question: 'Do I need to create an account to use Quilora?',
-      answer:
-        'An account is required for syncing sandboxes, saved insights, and billing. Some marketing pages may let you explore positioning without logging in, but full use needs sign-up.',
-    },
-    {
-      question: 'Can I share my sandboxes with others?',
-      answer:
-        'Sharing depends on the product version you are on. Where collaboration exists, use in-app share or export; otherwise treat your workspace as private until sharing is available.',
-    },
-    {
-      question: 'What devices and browsers does Quilora support?',
-      answer:
-        'Use a recent version of Chrome, Edge, Firefox, or Safari on desktop for the best experience. Performance on older browsers or very small screens may vary.',
+        'No—while it’s optimized for deep reading, you can use Quilora for any structured learning, research, or complex topic you want to understand better.',
     },
   ],
   features: [
@@ -227,12 +203,7 @@ export function FAQPage() {
       >
         <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-2">
-            <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-90">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-semibold text-white">Quilora</span>
-            </Link>
+            <QuiloraNavLogoLink />
 
             <div className="hidden flex-1 items-center justify-center gap-8 md:flex">
               <Link to="/features" className="cursor-pointer text-base text-white/70 transition-colors duration-200 hover:text-white">

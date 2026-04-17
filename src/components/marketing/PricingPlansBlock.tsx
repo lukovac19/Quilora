@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useNavigate } from 'react-router';
 import { Check, Info } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useApp } from '../../context/AppContext';
@@ -13,8 +13,6 @@ import {
 } from '../../lib/billingCheckout';
 import { markGenesisChoiceFlowPending } from '../../lib/genesisEarlyAccessSession';
 import { assertPrelaunchCheckoutAllowed } from '../../lib/prelaunchPurchaseGuards';
-import { markBookwormPlanSelectedForCurrentUser } from '../../lib/markPlanSelection';
-import { safeInternalPath } from '../../lib/safeInternalPath';
 import { DuplicatePrelaunchPurchaseModal } from '../prelaunch/DuplicatePrelaunchPurchaseModal';
 import { ScrollReveal } from '../ScrollReveal';
 
@@ -27,10 +25,8 @@ export type PricingPlansBlockProps = {
 
 /** Shared Bookworm · Sage · Genesis grid — used on /pricing and landing (#pricing) to stay in sync. */
 export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutCompleted }: PricingPlansBlockProps) {
-  const { user, refreshAuthUser } = useApp();
+  const { user } = useApp();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [bookwormConfirmBusy, setBookwormConfirmBusy] = useState(false);
   const [billingYearly, setBillingYearly] = useState(true);
   const [displayedBilling, setDisplayedBilling] = useState(true);
   const [priceReveal, setPriceReveal] = useState(true);
@@ -76,29 +72,6 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     if (onCheckoutCompleted) return { onCheckoutCompleted };
     return {} as { onCheckoutCompleted?: (p: CheckoutProductKey) => void };
   }, [onCheckoutCompleted]);
-
-  const confirmBookwormFreePlan = useCallback(async () => {
-    if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing?billing=required'));
-      return;
-    }
-    setBookwormConfirmBusy(true);
-    const r = await markBookwormPlanSelectedForCurrentUser();
-    if (!r.ok) {
-      toast.error(r.message ?? 'Could not confirm your plan');
-      setBookwormConfirmBusy(false);
-      return;
-    }
-    const hydrated = await refreshAuthUser();
-    setBookwormConfirmBusy(false);
-    if (!hydrated?.billingGatePassed) {
-      toast.error('Still pending — try again in a moment.');
-      return;
-    }
-    const dest = safeInternalPath(searchParams.get('redirect')) ?? '/dashboard';
-    toast.success('Bookworm plan confirmed — welcome in.');
-    navigate(dest, { replace: true });
-  }, [user?.id, navigate, refreshAuthUser, searchParams]);
 
   const runCheckoutSubscription = useCallback(async () => {
     if (!user?.id) {
@@ -582,166 +555,163 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3 md:items-stretch">
-        <div
-          className="animate-fade-in-up relative flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#266ba7]/35 hover:shadow-[0_24px_48px_-12px_rgba(38,107,167,0.25)]"
-          style={{ animationDelay: '0ms' }}
-        >
-          <div className="mb-6">
-            <h3 className="mb-1 text-2xl font-bold text-white">Bookworm</h3>
-            <p className="text-sm text-white/60">Solid credits each month — up to 5 sandboxes.</p>
-          </div>
-          <div
-            className={`mb-6 transition-all duration-300 ease-out ${priceReveal ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
-          >
-            {displayedBilling ? (
-              <div className="flex flex-col gap-1">
-                <span className="text-lg text-white/40 line-through">€6/month</span>
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span id="price-display-bookworm" className="text-5xl font-bold text-white">
-                    €4.92
-                  </span>
-                  <span className="text-sm text-white/50">/month</span>
+      <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:items-stretch md:gap-10 lg:gap-12">
+        <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0} className="flex h-full min-h-0 flex-col">
+          <div className="relative flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#266ba7]/40 hover:shadow-[0_24px_48px_-12px_rgba(38,107,167,0.28)]">
+            <div className="mb-6">
+              <h3 className="mb-1 text-2xl font-bold text-white">Bookworm</h3>
+            </div>
+            <div
+              className={`mb-6 transition-all duration-300 ease-out ${priceReveal ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
+            >
+              {displayedBilling ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-lg text-white/40 line-through">€6/month</span>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span id="price-display-bookworm" className="text-5xl font-bold text-white">
+                      €4.92
+                    </span>
+                    <span className="text-sm text-white/50">/month</span>
+                  </div>
+                  <span className="text-xs text-white/45">billed annually · tax-exclusive</span>
+                  <span className="text-xs text-white/45">Billed annually: €59.04 total</span>
                 </div>
-                <span className="text-xs text-white/45">billed annually · tax-exclusive</span>
-                <span className="text-xs text-white/45">Billed annually: €59.04 total</span>
-              </div>
-            ) : (
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-white">€6</span>
-                <span className="text-sm text-white/50">/month · tax-exclusive</span>
-              </div>
-            )}
-          </div>
-          <ul className="mb-8 space-y-3">
-            {['800 credits / month', 'Up to 5 sandboxes', 'Core canvas & AI'].map((f) => (
-              <li key={f} className="flex items-start gap-3 text-sm text-white/70">
-                <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                {f}
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void runCheckoutSubscription()}
-            className="w-full rounded-full bg-[#266ba7] py-3 font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/35 active:scale-[0.99]"
-          >
-            Choose Bookworm
-          </button>
-          <p className="mb-2 mt-4 text-center text-xs text-white/45">
-            Staying on the free tier? You still need to confirm Bookworm once — no card required.
-          </p>
-          <button
-            type="button"
-            disabled={bookwormConfirmBusy}
-            onClick={() => void confirmBookwormFreePlan()}
-            className="w-full rounded-full border border-white/20 bg-white/5 py-3 font-semibold text-white transition-all duration-200 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {bookwormConfirmBusy ? 'Saving…' : 'Confirm free Bookworm plan'}
-          </button>
-        </div>
-
-        <div
-          className="animate-fade-in-up relative flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#3b82c4] bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] p-8 shadow-2xl shadow-[#266ba7]/30 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_28px_56px_-12px_rgba(38,107,167,0.35)]"
-          style={{ animationDelay: '75ms' }}
-        >
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-1 text-sm font-semibold text-[#266ba7]">Most Popular</div>
-          <div className="mb-6">
-            <h3 className="mb-1 text-2xl font-bold text-white">Sage</h3>
-            <p className="text-sm text-white/80">Bibliophile tier — rollover credits, unlimited sandboxes.</p>
-          </div>
-          <div
-            className={`mb-6 transition-all duration-300 ease-out ${priceReveal ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
-          >
-            {displayedBilling ? (
-              <div className="flex flex-col gap-1">
-                <span className="text-lg text-white/50 line-through">€16/month</span>
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <span id="price-display-sage" className="text-5xl font-bold text-white">
-                    €13.12
-                  </span>
-                  <span className="text-sm text-white/70">/month</span>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-5xl font-bold text-white">€6</span>
+                    <span className="text-sm text-white/50">/month</span>
+                  </div>
+                  <span className="text-xs text-white/45">billed monthly · tax-exclusive</span>
                 </div>
-                <span className="text-xs text-white/60">billed annually · save 18% · tax-exclusive</span>
-                <span className="text-xs text-white/45">Billed annually: €157.44 total</span>
-              </div>
-            ) : (
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold text-white">€16</span>
-                <span className="text-sm text-white/70">/month · tax-exclusive</span>
-              </div>
-            )}
-          </div>
-          <ul className="mb-8 space-y-3">
-            {['2,500 credits / month', 'Unlimited sandboxes', 'Rollover credits', 'Priority-friendly usage'].map((f) => (
-              <li key={f} className="flex items-start gap-3 text-sm text-white/90">
-                <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-white" />
-                {f}
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            onClick={() => void runBibliophileCheckout()}
-            className="w-full rounded-full bg-white py-3 font-semibold text-[#266ba7] transition-all duration-200 hover:bg-white/95 hover:shadow-xl active:scale-[0.99]"
-          >
-            Upgrade to Sage
-          </button>
-        </div>
-
-        <div
-          className="animate-fade-in-up relative flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#266ba7]/50 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#7bbdf3]/40 hover:shadow-[0_24px_48px_-12px_rgba(123,189,243,0.15)]"
-          style={{ animationDelay: '150ms' }}
-        >
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full border border-[#266ba7] bg-[#266ba7]/15 px-4 py-1 text-sm font-semibold text-[#266ba7]">
-            Limited Offer
-          </div>
-          <div className="mb-6">
-            <h3 className="mb-1 text-2xl font-bold text-white">Genesis</h3>
-            <p className="text-sm text-white/60">Lifetime depth — strictly limited seats.</p>
-          </div>
-          <div className="mb-6 space-y-2">
-            <p className="text-xs text-white/50">One-time · tax-exclusive</p>
-            <div className="flex flex-wrap gap-4">
-              <div>
-                <p className="text-xs text-white/45">€80</p>
-                <span id="price-display-genesis-80" className="text-4xl font-bold text-white">
-                  €80
-                </span>
-                {genesisInventory ? (
-                  <p className="mt-1 text-xs text-[#7bbdf3]">{genesisInventory.genesis80.remaining} seats left</p>
-                ) : null}
-              </div>
-              <div>
-                <p className="text-xs text-white/45">€119</p>
-                <span id="price-display-genesis-119" className="text-4xl font-bold text-white">
-                  €119
-                </span>
-                {genesisInventory ? (
-                  <p className="mt-1 text-xs text-[#7bbdf3]">{genesisInventory.genesis119.remaining} seats left</p>
-                ) : null}
-              </div>
+              )}
+            </div>
+            <ul className="mb-8 flex flex-1 flex-col space-y-3">
+              {['800 credits / month', 'Up to 5 sandboxes', 'Core canvas & AI'].map((f) => (
+                <li key={f} className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
+                  <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-auto pt-6">
+              <button
+                type="button"
+                onClick={() => void runCheckoutSubscription()}
+                className="w-full rounded-full bg-[#266ba7] py-3 font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/35 active:scale-[0.99]"
+              >
+                Choose Bookworm
+              </button>
             </div>
           </div>
-          <ul className="mb-8 space-y-3">
-            {['15,000 credits / month', 'Unlimited sandboxes', 'Genesis badge & perks'].map((f) => (
-              <li key={f} className="flex items-start gap-3 text-sm text-white/70">
-                <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                {f}
-              </li>
-            ))}
-          </ul>
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={claimGenesisSeatEarly}
-              className="min-h-11 w-full rounded-full bg-[#266ba7] py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/30 active:scale-[0.99]"
+        </ScrollReveal>
+
+        <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0.06} className="flex h-full min-h-0 flex-col">
+          <div className="relative flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#3b82c4] bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] p-8 shadow-2xl shadow-[#266ba7]/30 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:shadow-[0_28px_56px_-12px_rgba(38,107,167,0.38)]">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-white px-4 py-1 text-sm font-semibold text-[#266ba7]">
+              Most Popular
+            </div>
+            <div className="mb-6">
+              <h3 className="mb-1 text-2xl font-bold text-white">Sage</h3>
+            </div>
+            <div
+              className={`mb-6 transition-all duration-300 ease-out ${priceReveal ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
             >
-              Choose your Genesis package
-            </button>
-            <p className="text-center text-xs text-white/45">€80 or €119 tier is selected on the next screen based on remaining seats.</p>
+              {displayedBilling ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-lg text-white/50 line-through">€16/month</span>
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span id="price-display-sage" className="text-5xl font-bold text-white">
+                      €13.12
+                    </span>
+                    <span className="text-sm text-white/70">/month</span>
+                  </div>
+                  <span className="text-xs text-white/60">billed annually · save 18% · tax-exclusive</span>
+                  <span className="text-xs text-white/45">Billed annually: €157.44 total</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="text-5xl font-bold text-white">€16</span>
+                    <span className="text-sm text-white/70">/month</span>
+                  </div>
+                  <span className="text-xs text-white/60">billed monthly · tax-exclusive</span>
+                </div>
+              )}
+            </div>
+            <ul className="mb-8 flex flex-1 flex-col space-y-3">
+              {['2,500 credits / month', 'Unlimited sandboxes', 'Rollover credits', 'Priority-friendly usage'].map((f) => (
+                <li key={f} className="flex items-start gap-3 text-sm leading-relaxed text-white/90">
+                  <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-white" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-auto pt-6">
+              <button
+                type="button"
+                onClick={() => void runBibliophileCheckout()}
+                className="w-full rounded-full bg-white py-3 font-semibold text-[#266ba7] transition-all duration-200 hover:bg-white/95 hover:shadow-xl active:scale-[0.99]"
+              >
+                Upgrade to Sage
+              </button>
+            </div>
           </div>
-        </div>
+        </ScrollReveal>
+
+        <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0.12} className="flex h-full min-h-0 flex-col">
+          <div className="relative flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#266ba7]/50 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#7bbdf3]/45 hover:shadow-[0_24px_48px_-12px_rgba(123,189,243,0.18)]">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full border border-[#266ba7] bg-[#266ba7]/15 px-4 py-1 text-sm font-semibold text-[#266ba7]">
+              Limited Offer
+            </div>
+            <div className="mb-6">
+              <h3 className="mb-1 text-2xl font-bold text-white">Genesis</h3>
+            </div>
+            <div className="mb-6 space-y-2">
+              <p className="text-xs text-white/50">One-time · tax-exclusive</p>
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <p className="text-xs text-white/45">€80</p>
+                  <span id="price-display-genesis-80" className="text-4xl font-bold text-white">
+                    €80
+                  </span>
+                  {genesisInventory ? (
+                    <p className="mt-1 text-xs text-[#7bbdf3]">{genesisInventory.genesis80.remaining} seats left</p>
+                  ) : null}
+                </div>
+                <div>
+                  <p className="text-xs text-white/45">€119</p>
+                  <span id="price-display-genesis-119" className="text-4xl font-bold text-white">
+                    €119
+                  </span>
+                  {genesisInventory ? (
+                    <p className="mt-1 text-xs text-[#7bbdf3]">{genesisInventory.genesis119.remaining} seats left</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <ul className="mb-8 flex flex-1 flex-col space-y-3">
+              {['15,000 credits / month', 'Unlimited sandboxes', 'Genesis badge & perks'].map((f) => (
+                <li key={f} className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
+                  <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
+                  {f}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-auto flex flex-col gap-2 pt-6">
+              <button
+                type="button"
+                onClick={claimGenesisSeatEarly}
+                className="min-h-11 w-full rounded-full bg-[#266ba7] py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/30 active:scale-[0.99]"
+              >
+                Choose your Genesis package
+              </button>
+              <p className="text-center text-xs text-white/45">
+                €80 or €119 tier is selected on the next screen based on remaining seats.
+              </p>
+            </div>
+          </div>
+        </ScrollReveal>
       </div>
 
       {!earlyAccessPricing ? (

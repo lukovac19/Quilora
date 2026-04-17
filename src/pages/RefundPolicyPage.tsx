@@ -1,5 +1,10 @@
 import { LegalDocumentPage, type LegalTocItem } from '../components/legal/LegalDocumentPage';
 import { RefundPolicyBody } from '../legal/refundPolicyBody';
+import {
+  QUILORA_CONTACT_EMAIL,
+  QUILORA_EFFECTIVE_DATE_LINE,
+  QUILORA_POSTAL_ADDRESS,
+} from '../lib/siteContact';
 
 const TOC: LegalTocItem[] = [
   { id: 'section-1', label: 'Section 1 — Introduction' },
@@ -19,8 +24,10 @@ export function RefundPolicyPage() {
     <LegalDocumentPage
       title="Refund Policy"
       lastUpdatedLine="Last updated: April 17, 2026"
+      effectiveDateLine={QUILORA_EFFECTIVE_DATE_LINE}
       heroSubtitle="When something goes wrong with a charge, here is how we think about fixes — fairly, predictably, and in plain language."
       toc={TOC}
+      contactFooter={{ email: QUILORA_CONTACT_EMAIL, address: QUILORA_POSTAL_ADDRESS }}
     >
       <RefundPolicyBody />
     </LegalDocumentPage>
