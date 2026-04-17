@@ -1,4 +1,4 @@
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { resolveSupabaseAnonKeyForClient, resolveSupabaseProjectId } from '../utils/supabase/credentials';
 
 export const QUILORA_EDGE_SLUG = 'make-server-5a3d4811';
 
@@ -13,7 +13,7 @@ Rules:
 - Do not mention API keys, backends, sign-in, sandboxes, or placeholders. Never say you cannot answer because of technical limits.`;
 
 export function quiloraFunctionsBaseUrl() {
-  return `https://${projectId}.supabase.co/functions/v1`;
+  return `https://${resolveSupabaseProjectId()}.supabase.co/functions/v1`;
 }
 
 /**
@@ -23,7 +23,7 @@ export function quiloraFunctionsBaseUrl() {
 /** GET JSON from edge (e.g. public billing routes). Optional bearer for user-scoped routes. */
 export async function quiloraEdgeGetJson<T>(relativePath: string, accessToken?: string | null): Promise<T> {
   const url = new URL(relativePath.replace(/^\//, ''), `${quiloraFunctionsBaseUrl()}/`);
-  const headers: Record<string, string> = { apikey: publicAnonKey };
+  const headers: Record<string, string> = { apikey: resolveSupabaseAnonKeyForClient() };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   const res = await fetch(url.href, { method: 'GET', headers });
   const ct = (res.headers.get('content-type') || '').toLowerCase();
@@ -54,7 +54,7 @@ export async function quiloraEdgePostJson<T>(relativePath: string, accessToken: 
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: publicAnonKey,
+      apikey: resolveSupabaseAnonKeyForClient(),
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(jsonBody),

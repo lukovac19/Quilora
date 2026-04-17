@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { BookOpen, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 
 const navLinkClass =
@@ -37,9 +37,7 @@ export function QuiloraMarketingNavBar({ logoOnly = false, preLaunchScreen1Nav =
         <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between gap-3">
             <Link to="/" className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-90">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
+              <img src="/quilora-logo-icon.png" alt="" className="h-10 w-10 shrink-0 object-contain" width={40} height={40} />
               <span className="truncate text-xl font-semibold text-white">Quilora</span>
             </Link>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
@@ -67,9 +65,7 @@ export function QuiloraMarketingNavBar({ logoOnly = false, preLaunchScreen1Nav =
         <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-start">
             <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-90">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-                <BookOpen className="h-5 w-5 text-white" />
-              </div>
+              <img src="/quilora-logo-icon.png" alt="" className="h-10 w-10 shrink-0 object-contain" width={40} height={40} />
               <span className="truncate text-xl font-semibold text-white">Quilora</span>
             </Link>
           </div>
@@ -87,9 +83,7 @@ export function QuiloraMarketingNavBar({ logoOnly = false, preLaunchScreen1Nav =
       <div className="container mx-auto max-w-7xl px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center justify-between gap-2">
           <Link to="/" className="flex min-w-0 flex-1 items-center gap-2 transition-opacity hover:opacity-90">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-              <BookOpen className="h-5 w-5 text-white" />
-            </div>
+            <img src="/quilora-logo-icon.png" alt="" className="h-10 w-10 shrink-0 object-contain" width={40} height={40} />
             <span className="truncate text-xl font-semibold text-white">Quilora</span>
           </Link>
 

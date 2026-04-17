@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { BookOpen, Facebook, Instagram, Linkedin } from 'lucide-react';
+import { Facebook, Instagram, Linkedin } from 'lucide-react';
 
 type QuiloraSiteFooterProps = {
   /** @deprecated No longer used; kept so existing call sites do not break. */
@@ -16,9 +16,7 @@ export function QuiloraSiteFooter({ className = '' }: QuiloraSiteFooterProps) {
       <div className="container mx-auto flex max-w-3xl flex-col items-center gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
           <div className="flex items-center justify-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f]">
-              <BookOpen className="h-5 w-5 text-white" aria-hidden />
-            </div>
+            <img src="/quilora-logo-icon.png" alt="" className="h-10 w-10 shrink-0 object-contain" width={40} height={40} aria-hidden />
             <span className="text-xl font-semibold text-white">Quilora</span>
           </div>
           <p className="max-w-lg text-sm leading-relaxed text-white/55 sm:text-base">

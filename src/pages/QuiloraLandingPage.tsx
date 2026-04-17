@@ -78,21 +78,29 @@ export function QuiloraLandingPage() {
 
   const testimonials = [
     {
-      name: 'Sarah Martinez',
-      comment: 'Quilora transformed how I approach my literature courses. The AI insights are incredible.',
+      name: 'Nejra Mehović',
+      avatarSrc: '/testimonials/review-1-nejra.png',
+      comment:
+        'All recommendations for Quilora — extremely well thought out. One of the rare tools that performs its job exceptionally well without errors, while also being very accessible and ideal for frequent use.',
     },
     {
-      name: 'James Chen',
-      comment: 'Finally, a tool that helps me truly understand complex texts instead of just summarizing them.',
+      name: 'Lejla Tucaković',
+      avatarSrc: '/testimonials/review-2-lejla.png',
+      comment:
+        'Quilora saved my high school education. I’m sure it will do the same for future generations. From personal experience, I know the creator is trustworthy and the product is built with genuine care.',
     },
     {
-      name: 'Emily Rodriguez',
-      comment: 'The mastery mode is a game-changer for retaining what I read.',
+      name: 'Adna Murguz',
+      avatarSrc: '/testimonials/review-3-adna.png',
+      comment:
+        'Quilora is very useful for students because it helps with understanding books in a simple and structured way. It provides clear summaries and analysis that make studying easier and definitely saves me a lot of time.',
     },
     {
-      name: 'Michael Thompson',
-      comment: 'I can finally engage with classic literature on a deeper level thanks to Quilora.',
-    }
+      name: 'Suada Spahić',
+      avatarSrc: '/testimonials/review-4-canvas.png',
+      comment:
+        'The Canvas is where I finally stop rereading the same chapter on loop. I pin ideas, nudge them into clusters, and draw light links between characters and themes until the shape of the argument is obvious. Visual thinking makes dense material feel manageable without dumbing it down.',
+    },
   ];
 
   return (
@@ -294,7 +302,15 @@ export function QuiloraLandingPage() {
                 <div className="group h-full">
                   <div className="h-full rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-6 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:border-[#266ba7]/35 hover:shadow-[0_24px_48px_-18px_rgba(38,107,167,0.32)] sm:p-8">
                     <div className="flex flex-col items-center space-y-4 text-center">
-                      <div className="h-16 w-16 shrink-0 rounded-full bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] ring-2 ring-white/5 transition-all duration-500 ease-out group-hover:shadow-[0_0_28px_rgba(38,107,167,0.35)] group-hover:ring-[#266ba7]/45" />
+                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-full ring-2 ring-white/5 transition-all duration-500 ease-out group-hover:shadow-[0_0_28px_rgba(38,107,167,0.35)] group-hover:ring-[#266ba7]/45">
+                        <img
+                          src={testimonial.avatarSrc}
+                          alt=""
+                          className="h-full w-full object-cover object-center"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      </div>
 
                       <h3 className="text-lg font-semibold text-white transition-colors duration-300 group-hover:text-[#e8f4ff]">
                         {testimonial.name}
@@ -304,7 +320,7 @@ export function QuiloraLandingPage() {
                         {[...Array(5)].map((_, i) => (
                           <Star
                             key={i}
-                            className="h-4 w-4 fill-[#266ba7] text-[#266ba7] transition-transform duration-300 ease-out will-change-transform group-hover:scale-110"
+                            className="h-4 w-4 fill-[#FACC15] text-[#FACC15] transition-transform duration-300 ease-out will-change-transform group-hover:scale-110"
                             style={{ transitionDelay: `${40 * i}ms` }}
                           />
                         ))}

@@ -1,12 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
+import {
+  isSupabaseAnonKeyConfigured,
+  resolveSupabaseAnonKeyForClient,
+  resolveSupabaseUrl,
+} from '../utils/supabase/credentials';
 
-// Initialize Supabase client
-const supabaseUrl = `https://${projectId}.supabase.co`;
-const supabaseAnonKey = publicAnonKey;
+const supabaseUrl = resolveSupabaseUrl();
+const supabaseAnonKey = resolveSupabaseAnonKeyForClient();
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Supabase environment variables are missing. Please connect your Supabase project.');
+if (!isSupabaseAnonKeyConfigured()) {
+  const msg =
+    '[Supabase] Nema ispravnog ključa — postavi VITE_SUPABASE_ANON_KEY u .env.local ili publicAnonKey u src/utils/supabase/info.tsx (anon JWT eyJ… ili sb_publishable_*; nikad sb_secret_*). Restartuj dev server nakon .env promjene.';
+  if (import.meta.env.DEV) console.warn(msg);
+  else console.error(msg);
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {

@@ -3,16 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useApp, type User } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
-import {
-  BookOpen,
-  Mail,
-  Lock,
-  X,
-  Sparkles,
-  LayoutGrid,
-  BrainCircuit,
-  Highlighter,
-} from 'lucide-react';
+import { Mail, Lock, X, Sparkles, LayoutGrid, BrainCircuit, Highlighter } from 'lucide-react';
 import { ModernNavbar } from '../components/ModernNavbar';
 import { safeInternalPath } from '../lib/safeInternalPath';
 import { markGenesisChoiceFlowPending } from '../lib/genesisEarlyAccessSession';
@@ -35,6 +26,25 @@ function parseAuthHashParams(): Record<string, string> {
 function isDuplicateEmailError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /already registered|already been registered|User already|email address is already|duplicate key/i.test(msg);
+}
+
+/** Supabase often returns this when Auth email (SMTP / built-in) is not configured or confirm-email flow fails. */
+function formatAuthProviderHint(message: string): string {
+  const lower = message.toLowerCase();
+  const emailFix =
+    'U Supabase Dashboard: Authentication → Providers → Email — za lokalni test isključi „Confirm email“, ili uključi Custom SMTP. Pogledaj i Logs → Auth za tačan uzrok.';
+  if (
+    lower.includes('confirmation email') ||
+    lower.includes('error sending') ||
+    lower.includes('sending email') ||
+    (lower.includes('email') && lower.includes('send'))
+  ) {
+    return `${message}\n\n${emailFix}`;
+  }
+  if (lower.includes('internal server error') || /\b500\b/.test(lower)) {
+    return `${message}\n\nČesto: isti problem s mejlom kao gore, ili SQL trigger na auth.users (npr. insert u profiles). Logs → Auth i Postgres u dashboardu.`;
+  }
+  return message;
 }
 
 /** EP-01 weak-password-error-state — explicit rules before Supabase signup. */
@@ -99,9 +109,7 @@ function AuthVisualPanel() {
 
       <div className="relative z-10 mx-auto w-full max-w-lg">
         <div className="mb-8 flex items-center gap-3 lg:hidden">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#266ba7] to-[#1e5a8f] shadow-lg">
-            <BookOpen className="h-5 w-5 text-white" />
-          </div>
+          <img src="/quilora-logo-icon.png" alt="" className="h-10 w-10 shrink-0 object-contain" width={40} height={40} />
           <span className="text-lg font-semibold text-white">Quilora</span>
         </div>
 
@@ -403,7 +411,7 @@ export function AuthPage() {
             setDuplicateEmailError(true);
             setError('An account with this email already exists. Try logging in instead.');
           } else {
-            setError(signUpError.message);
+            setError(formatAuthProviderHint(signUpError.message));
           }
           setLoading(false);
           return;
@@ -498,7 +506,8 @@ export function AuthPage() {
       }
     } catch (err: unknown) {
       console.error('Auth error:', err);
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      const raw = err instanceof Error ? err.message : 'Something went wrong';
+      setError(formatAuthProviderHint(raw));
     } finally {
       setLoading(false);
     }
@@ -571,7 +580,9 @@ export function AuthPage() {
                   </p>
 
                   {error && (
-                    <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+                    <div className="mt-8 whitespace-pre-line rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      {error}
+                    </div>
                   )}
 
                   <form onSubmit={handleSubmit} className="mt-10 space-y-5">
@@ -673,7 +684,9 @@ export function AuthPage() {
                   </div>
                 )}
                 {error && (
-                  <div className="mt-8 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+                  <div className="mt-8 whitespace-pre-line rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    {error}
+                  </div>
                 )}
 
                 {showSocial && (

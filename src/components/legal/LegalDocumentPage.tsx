@@ -75,7 +75,7 @@ export function LegalDocumentPage({
 
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-[#0a1929] font-[Inter,sans-serif] text-white">
-      <QuiloraMarketingNavBar />
+      <QuiloraMarketingNavBar logoOnly />
 
       <section className="relative overflow-x-hidden px-4 pb-20 pt-28 sm:px-6 sm:pb-24 sm:pt-36 lg:pb-28 lg:pt-44">
         <div className="pointer-events-none absolute inset-0 z-0" style={{ background: QUILORA_LANDING_GRADIENT }} aria-hidden />

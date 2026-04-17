@@ -85,43 +85,31 @@ export function ModernNavbar({ appearance = 'default', variant = 'default' }: Mo
         <div className="flex items-center justify-between">
           {/* Logo */}
           <Link to="/" className={`group ml-2 flex items-center gap-3 ${isAuthNav ? 'shrink-0' : 'min-w-0 shrink-0 md:min-w-0'}`}>
-            <div 
-              className="w-10 h-10 rounded-2xl flex items-center justify-center group-hover:shadow-lg transition-all duration-200"
-              style={{
-                background: `linear-gradient(to bottom right, ${colors.accent}, ${colors.accentDark})`
-              }}
-            >
-              <BookOpen className="w-6 h-6 text-white" />
-            </div>
-            <span 
+            {isAuthNav ? (
+              <img
+                src="/quilora-logo-icon.png"
+                alt=""
+                className="h-10 w-10 shrink-0 object-contain"
+                width={40}
+                height={40}
+              />
+            ) : (
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200 group-hover:shadow-lg"
+                style={{
+                  background: `linear-gradient(to bottom right, ${colors.accent}, ${colors.accentDark})`,
+                }}
+              >
+                <BookOpen className="h-6 w-6 text-white" />
+              </div>
+            )}
+            <span
               className="text-2xl font-bold transition-colors duration-300"
               style={{ color: colors.text }}
             >
               Quilora
             </span>
           </Link>
-
-          {isAuthNav && (
-            <nav
-              className="flex min-w-0 flex-1 justify-center overflow-x-auto px-1 [-ms-overflow-style:none] [scrollbar-width:none] md:px-2 [&::-webkit-scrollbar]:hidden"
-              aria-label="Marketing pages"
-            >
-              <div className="flex shrink-0 items-center gap-4 sm:gap-6 md:gap-8">
-                <Link to="/features" className="whitespace-nowrap text-base text-white/70 transition-colors duration-200 hover:text-white">
-                  Features
-                </Link>
-                <Link to="/how-it-works" className="whitespace-nowrap text-base text-white/70 transition-colors duration-200 hover:text-white">
-                  How it Works
-                </Link>
-                <Link to="/pricing" className="whitespace-nowrap text-base text-white/70 transition-colors duration-200 hover:text-white">
-                  Pricing
-                </Link>
-                <Link to="/faq" className="whitespace-nowrap text-base text-white/70 transition-colors duration-200 hover:text-white">
-                  FAQ
-                </Link>
-              </div>
-            </nav>
-          )}
 
           {!isAuthNav && (
             <nav
