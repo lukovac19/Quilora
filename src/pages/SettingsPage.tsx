@@ -96,6 +96,7 @@ export function SettingsPage() {
         toast.error('Please sign in again.');
         return;
       }
+      // After Polar portal session — user returns here. Production: ensure origin matches your deployed app (see TODO_APP_URL / VITE_APP_URL for checkout consistency).
       const returnUrl = `${window.location.origin}/settings`;
       const res = await quiloraEdgePostJson<{ customerPortalUrl?: string; error?: string }>(
         `${QUILORA_EDGE_SLUG}/billing/customer-portal`,

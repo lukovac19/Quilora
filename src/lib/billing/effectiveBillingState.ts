@@ -41,7 +41,7 @@ export function getEffectiveBillingState(params: {
   const sub = params.subscription;
   const tier = params.profileTier;
   const planKey = sub?.internal_plan_key && isInternalPlanKey(sub.internal_plan_key) ? sub.internal_plan_key : null;
-  const bp = sub?.billing_provider === 'polar' || sub?.billing_provider === 'paddle' ? sub.billing_provider : 'unknown';
+  const bp = sub?.billing_provider === 'polar' || sub?.billing_provider === 'legacy_checkout' ? sub.billing_provider : 'unknown';
   const portalAvailable = bp === 'polar';
 
   return {

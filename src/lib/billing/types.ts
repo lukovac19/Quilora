@@ -23,6 +23,6 @@ export type EffectiveBillingState = {
   isLifetime: boolean;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: string | null;
-  billingProvider: 'polar' | 'paddle' | 'unknown';
+  billingProvider: 'polar' | 'legacy_checkout' | 'unknown';
   portalAvailable: boolean;
 };

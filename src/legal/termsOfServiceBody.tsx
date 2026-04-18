@@ -13,7 +13,7 @@ export function TermsOfServiceBody() {
         </LegalParagraph>
         <LegalParagraph>
           Quilora is an AI-powered reading and knowledge-mapping platform that helps you build, connect, and validate deep understanding across your reading list, from fiction and narratives to any form of text. These Terms govern your access to and use of{' '}
-          <a href="https://quilora.app">https://quilora.app</a>, including all AI-powered analytical features, canvas tools, subscription services, credit systems, and related functionality (collectively, the &quot;Services&quot;). Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders.
+          <a href="https://quilora.app">https://quilora.app</a>, including all AI-powered analytical features, canvas tools, subscription services, credit systems, and related functionality (collectively, the &quot;Services&quot;). Our order process is conducted by our online reseller Polar. Polar is the Merchant of Record for all our orders.
         </LegalParagraph>
         <LegalParagraph>
           By registering an account, completing a purchase through our payment processor, or accessing any part of the Services, you confirm that you have read, understood, and agree to be bound by these Terms and our{' '}
@@ -37,7 +37,7 @@ export function TermsOfServiceBody() {
 
       <LegalSectionCard id="section-3" title="3. User Accounts">
         <LegalParagraph>
-          Account registration is completed through our third-party payment processor (Paddle.com), which acts as Merchant of Record for all transactions. Your account is created and activated only upon successful payment confirmation via Paddle&apos;s webhook system.
+          Account registration is completed through our third-party payment processor (Polar), which acts as Merchant of Record for all transactions. Your account is created and activated only upon successful payment confirmation via Polar&apos;s webhook system.
         </LegalParagraph>
         <LegalParagraph>You are responsible for:</LegalParagraph>
         <LegalBulletList>
@@ -132,8 +132,8 @@ export function TermsOfServiceBody() {
 
       <LegalSectionCard id="section-8" title="8. Subscriptions, Payments, and Credits">
         <LegalParagraph>
-          <strong>8.1 Payment Processor and Merchant of Record</strong> — All payments are processed exclusively through Paddle.com, which acts as the Merchant of Record and authorized reseller for all Quilora purchases. By completing a purchase, you also agree to Paddle&apos;s terms of service and privacy policy, available at{' '}
-          <a href="https://www.paddle.com">paddle.com</a>. Paddle provides all customer payment inquiries and handles payment-related returns.
+          <strong>8.1 Payment Processor and Merchant of Record</strong> — All payments are processed exclusively through Polar, which acts as the Merchant of Record and authorized reseller for all Quilora purchases. By completing a purchase, you also agree to Polar&apos;s terms of service and privacy policy, available at{' '}
+          <a href="https://polar.sh/legal/terms">polar.sh</a>. Polar provides all customer payment inquiries and handles payment-related returns.
         </LegalParagraph>
         <LegalParagraph>
           <strong>8.2 Subscription Tiers</strong> — Quilora offers the following subscription plans:
@@ -162,13 +162,13 @@ export function TermsOfServiceBody() {
 
       <LegalSectionCard id="section-9" title="9. Refund Policy">
         <LegalParagraph>
-          All refund requests are subject to Paddle&apos;s refund policies as Merchant of Record, in addition to the terms below. Full billing and refund details appear in our{' '}
+          All refund requests are subject to Polar&apos;s refund policies as Merchant of Record, in addition to the terms below. Full billing and refund details appear in our{' '}
           <Link to="/payments">Payments and Subscriptions Agreement</Link> and <Link to="/refund-policy">Refund Policy</Link>.
         </LegalParagraph>
         <LegalBulletList>
           <li>
             <strong>Subscriptions:</strong> You may request a refund within 48 hours of a charge if you believe it was made in error and the Services were not actively used during that period. Email{' '}
-            <a href={mail}>{QUILORA_CONTACT_EMAIL}</a> with your Paddle order number.
+            <a href={mail}>{QUILORA_CONTACT_EMAIL}</a> with your Polar order number.
           </li>
           <li>
             <strong>Boost Packs:</strong> Non-refundable once credits have been applied to your account.
@@ -181,7 +181,7 @@ export function TermsOfServiceBody() {
           </li>
         </LegalBulletList>
         <LegalParagraph>
-          Approved refunds are processed by Paddle and may take 5–10 business days to appear on your statement. Nothing in this policy limits your statutory rights under applicable consumer protection law.
+          Approved refunds are processed by Polar and may take 5–10 business days to appear on your statement. Nothing in this policy limits your statutory rights under applicable consumer protection law.
         </LegalParagraph>
       </LegalSectionCard>
 

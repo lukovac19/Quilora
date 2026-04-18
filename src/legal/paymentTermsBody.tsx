@@ -13,36 +13,36 @@ export function PaymentTermsBody() {
           Quilora is an AI-powered reading and knowledge-mapping platform that helps you build, connect, and validate deep understanding across your reading list, from fiction and narratives to any form of text. This Payments and Subscriptions Agreement (&quot;Payments Agreement&quot;) governs all financial transactions between you and Quilora, including subscription purchases, Genesis Account purchases, Boost Pack purchases, and credit allocation.
         </LegalParagraph>
         <LegalParagraph>
-          Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer payment service inquiries and handles payment-related returns.
+          Our order process is conducted by our online reseller Polar. Polar is the Merchant of Record for all our orders. Polar provides all customer payment service inquiries and handles payment-related returns.
         </LegalParagraph>
         <LegalParagraph>
           This Payments Agreement is incorporated into and forms part of the Quilora <Link to="/terms">Terms of Service</Link>. In the event of a conflict between this Payments Agreement and the Terms of Service, the Terms of Service prevail. By completing a purchase through Quilora, you agree to the terms of this Payments Agreement.
         </LegalParagraph>
       </LegalSectionCard>
 
-      <LegalSectionCard id="section-2" title="2. Merchant of Record — Paddle.com">
-        <LegalParagraph>All payments processed through Quilora are handled by Paddle.com Market Limited (&quot;Paddle&quot;), which acts as the reseller and Merchant of Record for all Quilora purchases. This means:</LegalParagraph>
+      <LegalSectionCard id="section-2" title="2. Merchant of Record — Polar">
+        <LegalParagraph>All payments processed through Quilora are handled by Polar, which acts as the reseller and Merchant of Record for all Quilora purchases. This means:</LegalParagraph>
         <LegalBulletList>
-          <li>Your payment is processed by Paddle, not directly by Quilora;</li>
-          <li>Paddle is responsible for collecting and remitting applicable sales tax, VAT, and other transaction taxes;</li>
-          <li>Your billing statement will show a charge from Paddle, not from Quilora;</li>
+          <li>Your payment is processed by Polar, not directly by Quilora;</li>
+          <li>Polar is responsible for collecting and remitting applicable sales tax, VAT, and other transaction taxes;</li>
+          <li>Your billing statement will show a charge from Polar, not from Quilora;</li>
           <li>
-            Payment card data, billing addresses, and payment credentials are collected and stored exclusively by Paddle — Quilora does not store your payment details;
+            Payment card data, billing addresses, and payment credentials are collected and stored exclusively by Polar — Quilora does not store your payment details;
           </li>
           <li>
-            Paddle&apos;s Terms of Service and Privacy Policy (available at{' '}
-            <a href="https://www.paddle.com" className={linkClass}>
-              paddle.com
+            Polar&apos;s Terms of Service and Privacy Policy (available at{' '}
+            <a href="https://polar.sh/legal/terms" className={linkClass}>
+              polar.sh
             </a>
             ) apply to the payment transaction itself.
           </li>
         </LegalBulletList>
-        <LegalParagraph>By purchasing through Quilora, you consent to your transaction data being shared with Paddle solely for billing and compliance purposes.</LegalParagraph>
+        <LegalParagraph>By purchasing through Quilora, you consent to your transaction data being shared with Polar solely for billing and compliance purposes.</LegalParagraph>
       </LegalSectionCard>
 
       <LegalSectionCard id="section-3" title="3. Subscription Tiers and Pricing">
         <LegalParagraph>
-          Quilora offers the following subscription plans. All prices are exclusive of applicable taxes, which are collected and remitted by Paddle as Merchant of Record.
+          Quilora offers the following subscription plans. All prices are exclusive of applicable taxes, which are collected and remitted by Polar as Merchant of Record.
         </LegalParagraph>
         <LegalBulletList>
           <li>
@@ -68,12 +68,12 @@ export function PaymentTermsBody() {
 
       <LegalSectionCard id="section-4" title="4. Billing and Auto-Renewal">
         <LegalBulletList>
-          <li>Bookworm and Sage subscriptions are billed on a monthly recurring basis. Your payment method on file with Paddle will be automatically charged at the start of each billing cycle.</li>
+          <li>Bookworm and Sage subscriptions are billed on a monthly recurring basis. Your payment method on file with Polar will be automatically charged at the start of each billing cycle.</li>
           <li>
             <strong>Billing date:</strong> The same calendar date each month as your initial purchase date.
           </li>
           <li>
-            <strong>Failed payments:</strong> If a payment fails, we will retry in accordance with Paddle&apos;s dunning process. Access to the Services may be restricted if payment cannot be collected after retry attempts.
+            <strong>Failed payments:</strong> If a payment fails, we will retry in accordance with Polar&apos;s dunning process. Access to the Services may be restricted if payment cannot be collected after retry attempts.
           </li>
           <li>
             <strong>Credit allocation:</strong> Monthly AI credits are allocated at the start of each billing cycle upon successful payment. Credits are not pro-rated for mid-cycle changes.
@@ -101,13 +101,13 @@ export function PaymentTermsBody() {
       </LegalSectionCard>
 
       <LegalSectionCard id="section-6" title="6. Refund Policy">
-        <LegalParagraph>Quilora&apos;s refund policy complies with Paddle&apos;s reseller terms and applicable consumer protection law.</LegalParagraph>
+        <LegalParagraph>Quilora&apos;s refund policy complies with Polar&apos;s reseller terms and applicable consumer protection law.</LegalParagraph>
         <LegalParagraph>
           <strong>6.1 Subscription Refunds</strong> — Refund requests for Bookworm or Sage subscription charges must be submitted within 48 hours of the billing date and must not involve active use of the Services during that billing cycle. Submit requests to{' '}
           <a href={mail} className={linkClass}>
             {QUILORA_CONTACT_EMAIL}
           </a>{' '}
-          with your Paddle order number and a description of the issue. Approved refunds are processed by Paddle and may take 5–10 business days to appear on your statement.
+          with your Polar order number and a description of the issue. Approved refunds are processed by Polar and may take 5–10 business days to appear on your statement.
         </LegalParagraph>
         <LegalParagraph>
           <strong>6.2 Boost Pack Refunds</strong> — Boost Pack purchases are non-refundable once AI credits have been applied to your account balance.
@@ -128,9 +128,9 @@ export function PaymentTermsBody() {
 
       <LegalSectionCard id="section-7" title="7. Taxes">
         <LegalParagraph>
-          As Merchant of Record, Paddle is responsible for determining, collecting, and remitting applicable sales tax, VAT, GST, and other transaction taxes based on your billing address and applicable tax laws. Prices displayed at checkout are exclusive of tax. Any applicable tax will be added at checkout.
+          As Merchant of Record, Polar is responsible for determining, collecting, and remitting applicable sales tax, VAT, GST, and other transaction taxes based on your billing address and applicable tax laws. Prices displayed at checkout are exclusive of tax. Any applicable tax will be added at checkout.
         </LegalParagraph>
-        <LegalParagraph>For business customers in VAT-registered jurisdictions, Paddle provides VAT-compliant invoices upon request.</LegalParagraph>
+        <LegalParagraph>For business customers in VAT-registered jurisdictions, Polar provides VAT-compliant invoices upon request.</LegalParagraph>
       </LegalSectionCard>
 
       <LegalSectionCard id="section-8" title="8. Credit System Terms">
@@ -180,9 +180,9 @@ export function PaymentTermsBody() {
           Initiating a chargeback without first contacting Quilora may result in account suspension. We reserve the right to contest chargebacks where the charge was valid and the Services were used.
         </LegalParagraph>
         <LegalParagraph>
-          For disputes related to the payment transaction itself, you may also contact Paddle&apos;s support directly (Merchant of Record):{' '}
-          <a href="https://www.paddle.com/help" className={linkClass}>
-            https://www.paddle.com/help
+          For disputes related to the payment transaction itself, you may also contact Polar&apos;s support directly (Merchant of Record):{' '}
+          <a href="https://polar.sh/docs" className={linkClass}>
+            https://polar.sh/docs
           </a>
           .
         </LegalParagraph>
@@ -210,7 +210,7 @@ export function PaymentTermsBody() {
           <li>Refund mechanisms are provided in accordance with Merchant of Record requirements and applicable consumer protection law.</li>
           <li>Quilora does not engage in deceptive billing, hidden fees, or unauthorized charges.</li>
           <li>Quilora does not use outbound telemarketing, automated social media marketing, or mass messaging as sales channels.</li>
-          <li>Quilora does not operate as a marketplace enabling non-Paddle sellers to sell products or services to end customers.</li>
+          <li>Quilora does not operate as a marketplace enabling third-party sellers to sell products or services to end customers.</li>
         </LegalBulletList>
       </LegalSectionCard>
 
@@ -226,9 +226,9 @@ export function PaymentTermsBody() {
           <strong>Address:</strong> Nerkeza Smailagića 11, Sarajevo, Bosnia and Herzegovina
         </LegalParagraph>
         <LegalParagraph>
-          For payment transaction disputes: contact Paddle support via{' '}
-          <a href="https://www.paddle.com/help" className={linkClass}>
-            https://www.paddle.com/help
+          For payment transaction disputes: contact Polar support via{' '}
+          <a href="https://polar.sh/docs" className={linkClass}>
+            https://polar.sh/docs
           </a>
           .
         </LegalParagraph>

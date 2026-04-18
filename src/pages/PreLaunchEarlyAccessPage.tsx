@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import type { CheckoutProductKey } from '../lib/billingCheckout';
+import type { InternalPlanKey } from '../lib/billing/types';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
@@ -9,7 +9,7 @@ export function PreLaunchEarlyAccessPage() {
   const navigate = useNavigate();
 
   const onCheckoutCompleted = useCallback(
-    (_product: CheckoutProductKey) => {
+    (_product: InternalPlanKey) => {
       navigate('/onboarding');
     },
     [navigate],

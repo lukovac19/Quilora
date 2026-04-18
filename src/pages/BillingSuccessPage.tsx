@@ -4,12 +4,21 @@ import { toast } from 'sonner@2.0.3';
 import { useApp } from '../context/AppContext';
 import { openPlanCheckout, POLAR_POST_GENESIS_PLAN_KEY } from '../lib/billingCheckout';
 import type { InternalPlanKey } from '../lib/billing/types';
-import { QUILORA_EDGE_SLUG, quiloraEdgePostJson } from '../lib/quiloraEdge';
+import { normalizeBillingState, type BillingMePayload } from '../lib/billing/status';
+import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from '../lib/quiloraEdge';
 import { supabase } from '../lib/supabase';
 
 const AFTER_CHECKOUT_NAV_KEY = 'quilora_after_checkout_nav';
 const PENDING_GENESIS_BUNDLE_SS = 'quilora_pending_genesis_bundle';
 const GENESIS_BUNDLE_LS = 'quiloraGenesisBundleChoice';
+
+const POLL_MS = 2000;
+const POLL_MAX_MS = 60000;
+
+async function fetchBillingMeActive(token: string): Promise<boolean> {
+  const me = await quiloraEdgeGetJson<BillingMePayload>(`${QUILORA_EDGE_SLUG}/billing/me`, token);
+  return Boolean(normalizeBillingState(me)?.activeAccess);
+}
 
 export function BillingSuccessPage() {
   const { refreshAuthUser } = useApp();
@@ -40,7 +49,30 @@ export function BillingSuccessPage() {
           });
           return;
         }
-        await quiloraEdgePostJson(`${QUILORA_EDGE_SLUG}/billing/sync-checkout`, token, { checkoutId });
+
+        const pollUntilActive = async () => {
+          const deadline = Date.now() + POLL_MAX_MS;
+          while (!cancelled && Date.now() < deadline) {
+            if (await fetchBillingMeActive(token)) return true;
+            await new Promise((r) => setTimeout(r, POLL_MS));
+          }
+          return false;
+        };
+
+        try {
+          await quiloraEdgePostJson(`${QUILORA_EDGE_SLUG}/billing/sync-checkout`, token, { checkoutId });
+        } catch {
+          /* webhook may still be processing — poll billing state */
+        }
+        if (cancelled) return;
+
+        if (!(await fetchBillingMeActive(token))) {
+          const ok = await pollUntilActive();
+          if (!ok && !cancelled) {
+            throw new Error('Billing not active yet — try refreshing in a moment.');
+          }
+        }
+
         if (cancelled) return;
         await refreshAuthUser();
 
@@ -109,8 +141,10 @@ export function BillingSuccessPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-[#0a1929] px-6 text-center text-white">
-      <p className="text-lg font-semibold">Activating your plan…</p>
-      <p className="mt-2 max-w-md text-sm text-white/60">This usually takes a few seconds while we confirm payment and update your account.</p>
+      <p className="text-lg font-semibold">Syncing your access…</p>
+      <p className="mt-2 max-w-md text-sm text-white/60">
+        This usually takes a few seconds while we confirm payment and update your account. Do not close this tab.
+      </p>
     </div>
   );
 }

@@ -1,3 +1,4 @@
+/** API host. Override with POLAR_API_BASE secret if Polar changes URLs. Search: TODO_POLAR_API_BASE | TODO_POLAR_ENV */
 export function polarServerBaseUrl(): string {
   const override = Deno.env.get('POLAR_API_BASE')?.trim();
   if (override) return override.replace(/\/$/, '');
@@ -11,6 +12,7 @@ export async function polarApiJson<T>(
   path: string,
   body?: unknown,
 ): Promise<T> {
+  // TODO_POLAR_ACCESS_TOKEN — Organization Access Token from Polar dashboard → Supabase Edge secret POLAR_ACCESS_TOKEN
   const token = Deno.env.get('POLAR_ACCESS_TOKEN')?.trim();
   if (!token) throw new Error('POLAR_ACCESS_TOKEN is not configured');
   const url = `${polarServerBaseUrl()}${path.startsWith('/') ? path : `/${path}`}`;

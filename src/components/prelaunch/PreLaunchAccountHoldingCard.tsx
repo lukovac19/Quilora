@@ -87,7 +87,7 @@ export function PreLaunchAccountHoldingCard({
           <p>
             Your spot is locked in and your plan starts on launch day. If Quilora doesn&apos;t reach public launch
             (defined as full canvas access for all paid users) within 90 days of your purchase, you&apos;ll receive a
-            full refund automatically via Paddle.
+            full refund automatically when your payment provider supports it.
           </p>
           {!isGenesis ? (
             <p>
@@ -211,14 +211,14 @@ export function PreLaunchAccountHoldingCard({
             <p className="mt-4 text-sm leading-relaxed text-white/70">
               {user.profileTier === 'bibliophile' ? (
                 <>
-                  Your existing Sage subscription should be cancelled and fully refunded in Paddle before you complete
+                  Your existing Sage subscription should be cancelled and fully refunded in your billing portal before you complete
                   Lifetime checkout. Ready to proceed? After you confirm, you&apos;ll pick your Genesis package (Lifetime
-                  Deal only or + 1 Year Sage), then complete checkout in Paddle.
+                  Deal only or + 1 Year Sage), then complete checkout.
                 </>
               ) : (
                 <>
                   You&apos;ll choose your Genesis package next (Lifetime Deal only or + 1 Year Sage), then complete
-                  checkout in Paddle. If you already have another paid Quilora subscription, cancel it for a full refund
+                  checkout. If you already have another paid Quilora subscription, cancel it for a full refund
                   first or contact {SUPPORT} for help.
                 </>
               )}
@@ -240,7 +240,7 @@ export function PreLaunchAccountHoldingCard({
               </button>
             </div>
             <p className="mt-4 text-xs text-white/40">
-              Refund of your current pre-launch subscription is processed in Paddle when you cancel or migrate billing
+              Refund of your current pre-launch subscription is processed through your payment provider when you cancel or migrate billing
               — contact {SUPPORT} if you need help.
             </p>
           </div>
@@ -275,7 +275,7 @@ export function PreLaunchAccountHoldingCard({
             </div>
             <p className="mt-4 text-sm leading-relaxed text-white/70">
               For Bookworm or Sage, you can cancel before launch day for a full refund. Use the billing link from your
-              Paddle receipt, or email {SUPPORT} with the email you used at checkout and we&apos;ll help you complete
+              Your payment receipt, or email {SUPPORT} with the email you used at checkout and we&apos;ll help you complete
               cancellation (PAY-10).
             </p>
             <div className="mt-6 flex flex-wrap justify-end gap-2">

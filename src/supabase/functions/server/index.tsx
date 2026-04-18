@@ -18,28 +18,19 @@
     setPlanSelectionCompleted,
     setTier,
   } from './credit_service.ts';
-  import {
-    getGenesisInventory,
-    hasProcessedPaddleEvent,
-    markPaddleEventProcessed,
-    verifyPaddleSignature,
-  } from './paddle_service.ts';
+  import { getGenesisInventory } from './genesis_inventory_service.ts';
   import {
     adminLinkOrphanPayment,
-    assertPrelaunchWebhookPurchaseAllowed,
     cancelGenesisReleaseSeat,
     cancelPrelaunchBookwormSage,
-    consumeCheckoutPassthrough,
     createCheckoutPassthrough,
     enqueueEmail,
     getPublicLaunchComplete,
-    handleTransactionCompleted,
     processEmailOutboxBatch,
     reconcileOrphanPayments,
     reportWebhookDelayForUser,
     runNinetyDayRefundCheck,
     setPublicLaunchComplete,
-    validatePassthroughForCheckout,
   } from './prelaunch_v4_service.ts';
   import {
     buildPolarBillingMe,
@@ -899,6 +890,12 @@ app.post('/make-server-5a3d4811/billing/sync-checkout', async (c) => {
   }
 });
 
+/**
+ * Polar → Webhooks → URL to register (replace PROJECT_REF):
+ * TODO_POLAR_WEBHOOK_URL → https://PROJECT_REF.supabase.co/functions/v1/make-server-5a3d4811/billing/polar-webhook
+ * Enable event types handled in `processPolarWebhookEnvelope` (polar_billing.ts): order.created; subscription.* ;
+ * customer.state_changed / customer.updated; checkout.updated (confirmed/succeeded).
+ */
 app.post('/make-server-5a3d4811/billing/polar-webhook', async (c) => {
   const rawBody = await c.req.text();
   const polarEventId = c.req.header('webhook-id')?.trim() || `polar_body_${crypto.randomUUID()}`;
@@ -947,7 +944,7 @@ app.post('/make-server-5a3d4811/internal/cron/reconcile-orphan-payments', async 
   }
 });
 
-/** EC-05 — manual link of orphan Paddle transaction row to a Supabase user (support / admin). */
+/** EC-05 — manual link of orphan billing transaction row to a Supabase user (support / admin). */
 app.post('/make-server-5a3d4811/internal/admin/link-orphan-payment', async (c) => {
   try {
     if (c.req.header('x-admin-billing-secret') !== Deno.env.get('ADMIN_BILLING_SECRET')) {
@@ -1027,106 +1024,6 @@ app.post('/make-server-5a3d4811/billing/boost-pack/simulate', async (c) => {
   } catch (error) {
     console.error('Boost pack simulation error:', error);
     return c.json({ error: 'Error adding boost pack credits' }, 500);
-  }
-});
-
-app.post('/make-server-5a3d4811/payments/paddle/webhook', async (c) => {
-  try {
-    const rawBody = await c.req.text();
-    const signature = c.req.header('Paddle-Signature');
-    const signatureCheck = await verifyPaddleSignature(rawBody, signature);
-    if (!signatureCheck.ok) return c.json({ error: 'Invalid webhook signature' }, 401);
-
-    const payload = JSON.parse(rawBody) as Record<string, unknown>;
-    const providerEventId = String(payload['event_id'] ?? '');
-    if (!providerEventId) return c.json({ error: 'Missing event_id' }, 400);
-    if (await hasProcessedPaddleEvent(supabase, providerEventId)) return c.json({ ok: true, duplicate: true });
-
-    const eventType = String(payload['event_type'] ?? '');
-    const data = (payload['data'] ?? {}) as Record<string, unknown>;
-    const metadata = (data['custom_data'] ?? {}) as Record<string, unknown>;
-    const userId = String(metadata['userId'] ?? '');
-    if (!userId) return c.json({ error: 'Missing userId custom_data' }, 400);
-
-    const billingDetails = (data['billing_details'] ?? {}) as Record<string, unknown>;
-    const customerEmail =
-      (typeof billingDetails['email'] === 'string' ? billingDetails['email'] : null) ??
-      (typeof (data['customer'] as Record<string, unknown> | undefined)?.['email'] === 'string'
-        ? String((data['customer'] as Record<string, unknown>).email)
-        : null);
-    const paddleTransactionId = typeof data['id'] === 'string' ? data['id'] : null;
-    const paddleCustomerId = typeof data['customer_id'] === 'string' ? data['customer_id'] : null;
-
-    if (eventType === 'transaction.completed') {
-      const productKind = String(metadata['productKind'] ?? '');
-      if (!productKind) return c.json({ error: 'Missing productKind in custom_data' }, 400);
-      const passthroughToken =
-        typeof metadata['passthroughToken'] === 'string' ? metadata['passthroughToken'].trim() : undefined;
-      if (Deno.env.get('REQUIRE_CHECKOUT_PASSTHROUGH') === 'true' && !passthroughToken) {
-        return c.json({ error: 'Missing passthroughToken in custom_data' }, 400);
-      }
-      const passVal = await validatePassthroughForCheckout(supabase, passthroughToken, userId, customerEmail);
-      if (!passVal.ok) {
-        console.warn('checkout passthrough rejected', passVal.error, { userId, providerEventId });
-        return c.json({ error: passVal.error }, 400);
-      }
-      const dup = await assertPrelaunchWebhookPurchaseAllowed(supabase, userId, productKind);
-      if (!dup.ok) {
-        console.warn('duplicate prelaunch purchase blocked', dup.error, { userId, productKind, providerEventId });
-        return c.json({ error: dup.error }, 409);
-      }
-      await handleTransactionCompleted(supabase, {
-        userId,
-        productKind,
-        providerEventId,
-        customerEmail,
-        paddleTransactionId,
-        paddleCustomerId,
-        rawCustom: metadata,
-      });
-      await consumeCheckoutPassthrough(supabase, passthroughToken);
-    }
-
-    if (eventType === 'subscription.created' || eventType === 'subscription.updated') {
-      const tier = normalizedTierFromLegacy(String(metadata['tier'] ?? 'bookworm'));
-      const prev = await getProfile(supabase, userId);
-      const prevTier = (prev?.tier as string) ?? 'bookworm';
-      await setTier(supabase, userId, tier);
-      if (prevTier === 'bibliophile' && tier === 'bookworm') {
-        await applyBookwormSandboxReadonly(supabase, userId);
-      }
-      if (eventType === 'subscription.created') {
-        await markPrelaunchPurchaseProfile(supabase, userId);
-        await setPlanSelectionCompleted(supabase, userId, true);
-        const subId = typeof data['id'] === 'string' ? data['id'] : null;
-        const custId = typeof data['customer_id'] === 'string' ? data['customer_id'] : null;
-        await supabase.from('subscriptions').delete().eq('user_id', userId);
-        await supabase.from('subscriptions').insert({
-          user_id: userId,
-          paddle_subscription_id: subId,
-          paddle_customer_id: custId,
-          tier,
-          status: 'active',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-      }
-      if (eventType === 'subscription.updated') {
-        const paddleStatus = String(data['status'] ?? '');
-        if (tier === 'bookworm' && paddleStatus === 'active') {
-          await applyBookwormMonthlyRenewal(supabase, userId, `sub_renew_bw_${providerEventId}`);
-        }
-        if (tier === 'bibliophile' && paddleStatus === 'active') {
-          await applyBibliophileMonthlyRenewal(supabase, userId, `sub_renew_bib_${providerEventId}`);
-        }
-      }
-    }
-
-    await markPaddleEventProcessed(supabase, providerEventId, payload);
-    return c.json({ ok: true });
-  } catch (error) {
-    console.error('Paddle webhook error:', error);
-    return c.json({ error: 'Error handling Paddle webhook' }, 500);
   }
 });
 

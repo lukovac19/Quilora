@@ -1,3 +1,9 @@
+/**
+ * Polar plan → product id mapping. Values are **not** hardcoded: each plan reads a Deno env var (Supabase Edge secrets).
+ * Search: TODO_POLAR_MANUAL_SETUP | TODO_POLAR_PRODUCT_BOOKWORM_MONTHLY | TODO_POLAR_PRODUCT_BOOKWORM_YEARLY |
+ *        TODO_POLAR_PRODUCT_SAGE_MONTHLY | TODO_POLAR_PRODUCT_SAGE_YEARLY | TODO_POLAR_PRODUCT_GENESIS_LIFETIME |
+ *        TODO_POLAR_PRODUCT_BOOST_PACK
+ */
 export type PolarPlanKey =
   | 'bookworm_monthly'
   | 'bookworm_yearly'
@@ -15,12 +21,19 @@ const KEYS: readonly PolarPlanKey[] = [
   'boost_pack',
 ] as const;
 
+/** Env var names only — paste real Polar product UUIDs in Supabase secrets for each key. */
 const ENV_BY_PLAN: Record<PolarPlanKey, string> = {
+  // TODO_POLAR_PRODUCT_BOOKWORM_MONTHLY
   bookworm_monthly: 'POLAR_PRODUCT_BOOKWORM_MONTHLY',
+  // TODO_POLAR_PRODUCT_BOOKWORM_YEARLY
   bookworm_yearly: 'POLAR_PRODUCT_BOOKWORM_YEARLY',
+  // TODO_POLAR_PRODUCT_SAGE_MONTHLY
   sage_monthly: 'POLAR_PRODUCT_SAGE_MONTHLY',
+  // TODO_POLAR_PRODUCT_SAGE_YEARLY
   sage_yearly: 'POLAR_PRODUCT_SAGE_YEARLY',
+  // TODO_POLAR_PRODUCT_GENESIS_LIFETIME
   genesis_lifetime: 'POLAR_PRODUCT_GENESIS_LIFETIME',
+  // TODO_POLAR_PRODUCT_BOOST_PACK
   boost_pack: 'POLAR_PRODUCT_BOOST_PACK',
 };
 

@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-/** EP-02: explicit Bookworm plan confirmation (no Paddle checkout). */
+/** EP-02: explicit Bookworm plan confirmation (no paid checkout). */
 export async function markBookwormPlanSelectedForCurrentUser(): Promise<{ ok: boolean; message?: string }> {
   const {
     data: { user },

@@ -1,13 +1,6 @@
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2';
 import { GENESIS_SLOT_LIMITS } from './billing_config.ts';
 
-type PaddleWebhookPayload = {
-  event_id?: string;
-  event_type?: string;
-  occurred_at?: string;
-  data?: Record<string, unknown>;
-};
-
 export type GenesisTier = 'genesis_80' | 'genesis_119';
 
 function pricePointFromTier(tier: GenesisTier): '80' | '119' {
@@ -61,38 +54,4 @@ export async function getGenesisInventory(admin: SupabaseClient) {
     genesis80: { sold: sold80, cap: cap80, remaining: Math.max(0, cap80 - sold80) },
     genesis119: { sold: sold119, cap: cap119, remaining: Math.max(0, cap119 - sold119) },
   };
-}
-
-export async function hasProcessedPaddleEvent(admin: SupabaseClient, providerEventId: string) {
-  const { data } = await admin.from('paddle_webhook_dedup').select('event_id').eq('event_id', providerEventId).maybeSingle();
-  return Boolean(data?.event_id);
-}
-
-export async function markPaddleEventProcessed(
-  admin: SupabaseClient,
-  providerEventId: string,
-  _payload: PaddleWebhookPayload,
-) {
-  const { error } = await admin.from('paddle_webhook_dedup').insert({ event_id: providerEventId });
-  if (error && !String(error.message).toLowerCase().includes('duplicate')) {
-    console.warn('markPaddleEventProcessed', error);
-  }
-}
-
-export async function appendPaymentLog(_admin: SupabaseClient, _userId: string, _payload: Record<string, unknown>) {
-  /* retained for API compatibility; audit lives in credit_events + subscriptions */
-}
-
-export async function verifyPaddleSignature(rawBody: string, signatureHeader: string | null) {
-  const secret = Deno.env.get('PADDLE_WEBHOOK_SECRET');
-  if (!secret) {
-    return { ok: true, reason: 'missing_secret_skip_verification' as const };
-  }
-  if (!signatureHeader) return { ok: false, reason: 'missing_signature' as const };
-  const expectedPrefix = secret.slice(0, 8);
-  if (!signatureHeader.includes(expectedPrefix) && signatureHeader.length < 20) {
-    return { ok: false, reason: 'signature_mismatch' as const };
-  }
-  if (rawBody.length === 0) return { ok: false, reason: 'empty_body' as const };
-  return { ok: true, reason: 'ok' as const };
 }

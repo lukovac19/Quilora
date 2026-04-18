@@ -8,7 +8,7 @@ import {
 
 const TOC: LegalTocItem[] = [
   { id: 'section-1', label: '1. Introduction' },
-  { id: 'section-2', label: '2. Paddle (MoR)' },
+  { id: 'section-2', label: '2. Polar (MoR)' },
   { id: 'section-3', label: '3. Subscription refunds' },
   { id: 'section-4', label: '4. Boost Packs' },
   { id: 'section-5', label: '5. Genesis' },

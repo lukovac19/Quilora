@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { openPaddleCheckout } from '../lib/billingCheckout';
+import { openPlanCheckout } from '../lib/billingCheckout';
 import { useApp } from '../context/AppContext';
 
 type Props = {
@@ -20,8 +20,8 @@ export function BoostPackModal({ open, onClose }: Props) {
       onClose();
       return;
     }
-    const res = await openPaddleCheckout({
-      product: 'boost_pack',
+    const res = await openPlanCheckout({
+      planKey: 'boost_pack',
       userId: user.id,
       email: user.email,
     });

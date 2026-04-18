@@ -5,7 +5,8 @@ import { useApp } from '../context/AppContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { openPaddleCheckout, type CheckoutProductKey } from '../lib/billingCheckout';
+import { openPlanCheckout } from '../lib/billingCheckout';
+import type { InternalPlanKey } from '../lib/billing/types';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
 
 let pricingBoostCheckoutThrottleAt = 0;
@@ -13,7 +14,7 @@ let pricingBoostCheckoutThrottleAt = 0;
 export function PricingPage() {
   const { user } = useApp();
   const navigate = useNavigate();
-  const onCheckoutCompletedPlan = useCallback((_product: CheckoutProductKey) => {
+  const onCheckoutCompletedPlan = useCallback((_product: InternalPlanKey) => {
     navigate('/onboarding');
   }, [navigate]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -70,8 +71,8 @@ export function PricingPage() {
     const email = user.email;
     let cancelled = false;
     void (async () => {
-      const res = await openPaddleCheckout({
-        product: 'boost_pack',
+      const res = await openPlanCheckout({
+        planKey: 'boost_pack',
         userId: uid,
         email,
       });
@@ -265,7 +266,7 @@ export function PricingPage() {
                   navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing?checkout=boost'));
                   return;
                 }
-                void openPaddleCheckout({ product: 'boost_pack', userId: user.id, email: user.email }).then((res) => {
+                void openPlanCheckout({ planKey: 'boost_pack', userId: user.id, email: user.email }).then((res) => {
                   if (!res.ok && res.reason !== 'not_configured') toast.error(res.message);
                   else if (!res.ok && import.meta.env.DEV) toast.message(res.message);
                   else if (res.ok) toast.success('Checkout opened — credits apply after payment is confirmed.');

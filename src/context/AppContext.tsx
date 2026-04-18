@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from '../lib/supabase';
 import { computeBillingGatePassed } from '../lib/billingGate';
 import { subscriptionRowGrantsPaidSeat } from '../lib/billing/effectiveBillingState';
+import { normalizeBillingState, type BillingMePayload } from '../lib/billing/status';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson } from '../lib/quiloraEdge';
 import { registerPostCheckoutWebhookDelayWatch } from '../lib/postCheckoutWebhookDelayWatch';
 
@@ -163,6 +164,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .limit(1),
     ]);
     const sub = subRows?.[0] ?? null;
+    let edgeBillingActive = false;
+    try {
+      const me = await quiloraEdgeGetJson<BillingMePayload>(`${QUILORA_EDGE_SLUG}/billing/me`, session.access_token);
+      edgeBillingActive = Boolean(normalizeBillingState(me)?.activeAccess);
+    } catch {
+      edgeBillingActive = false;
+    }
     const meta = u.user_metadata as {
       name?: string;
       email_product_tips?: boolean;
@@ -178,7 +186,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       rawTier === 'bibliophile' || rawTier === 'genesis' ? rawTier : 'bookworm';
     const emailConfirmed = Boolean(u.email_confirmed_at);
     const planSelectionCompleted = Boolean((profile as { plan_selection_completed?: boolean } | null)?.plan_selection_completed);
-    const hasActivePaidSubscription = sub
+    const subGrants = sub
       ? subscriptionRowGrantsPaidSeat({
           status: sub.status as string,
           cancel_at_period_end: sub.cancel_at_period_end as boolean | null,
@@ -186,6 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           is_lifetime: sub.is_lifetime as boolean | null,
         })
       : false;
+    const hasActivePaidSubscription = edgeBillingActive || subGrants;
     const billingGatePassed = computeBillingGatePassed({
       profileTier,
       planSelectionCompleted,

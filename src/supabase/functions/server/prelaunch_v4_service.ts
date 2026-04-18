@@ -11,8 +11,8 @@ import {
   markPrelaunchPurchaseProfile,
 } from './credit_service.ts';
 import { TIER_LIMITS, type QuiloraTier } from './billing_config.ts';
-import { releaseGenesisSlot, reserveGenesisSlot } from './paddle_service.ts';
-import { paddleCancelSubscriptionImmediately, paddleCreateFullRefund } from './paddle_billing_api.ts';
+import { releaseGenesisSlot, reserveGenesisSlot } from './genesis_inventory_service.ts';
+import { createPolarFullRefund, isLikelyPolarOrderId, revokePolarSubscription } from './billing_adjustments.ts';
 
 type Json = Record<string, unknown>;
 
@@ -83,7 +83,7 @@ export async function validatePassthroughForCheckout(
   return { ok: true };
 }
 
-/** Single-use checkout binding (EC-05) — call after successful `transaction.completed` handling. */
+/** Single-use checkout binding (EC-05) — call after successful paid checkout handling. */
 export async function consumeCheckoutPassthrough(admin: SupabaseClient, token: string | undefined) {
   if (!token) return;
   await admin
@@ -95,7 +95,7 @@ export async function consumeCheckoutPassthrough(admin: SupabaseClient, token: s
 
 /**
  * PAY-09 / EC-09 — last-line duplicate guard on the server (client already blocks most cases).
- * Rejects clearly conflicting Paddle completions for the same Supabase user.
+ * Rejects clearly conflicting checkout completions for the same Supabase user.
  */
 export async function assertPrelaunchWebhookPurchaseAllowed(
   admin: SupabaseClient,
@@ -112,7 +112,7 @@ export async function assertPrelaunchWebhookPurchaseAllowed(
   }
 
   if (productKind.startsWith('bibliophile')) {
-    // Genesis + 1Y Sage bundle is still two Paddle checkouts in the client — allow Sage after Genesis seat.
+    // Genesis + Sage bundle may use sequential checkouts — allow Sage after Genesis seat.
     if (tier === 'genesis') return { ok: true };
     if (tier === 'bibliophile' && firstAt) return { ok: false, error: 'DUPLICATE_SAGE' };
     return { ok: true };
@@ -148,7 +148,7 @@ export async function reportWebhookDelayForUser(
     userId,
     userEmail: email,
     productHint: productHint ?? null,
-    note: 'Paddle checkout reported success in the browser, but billing activation was still pending after ~5 minutes.',
+    note: 'Checkout reported success in the browser, but billing activation was still pending after ~5 minutes.',
   });
 }
 
@@ -190,22 +190,22 @@ export async function processEmailOutboxBatch(admin: SupabaseClient, limit = 15)
   }
 }
 
-export async function logPaddleTransaction(
+export async function logBillingTransaction(
   admin: SupabaseClient,
   input: {
     userId: string | null;
-    paddleTransactionId: string | null;
-    paddleCustomerId: string | null;
+    externalTransactionId: string | null;
+    externalCustomerId: string | null;
     customerEmail: string | null;
     productKind: string;
     eventId: string;
     rawCustom: Json;
   },
 ) {
-  const { error } = await admin.from('paddle_transactions').insert({
+  const { error } = await admin.from('billing_transactions').insert({
     user_id: input.userId,
-    paddle_transaction_id: input.paddleTransactionId,
-    paddle_customer_id: input.paddleCustomerId,
+    external_transaction_id: input.externalTransactionId,
+    external_customer_id: input.externalCustomerId,
     customer_email: input.customerEmail?.toLowerCase() ?? null,
     product_kind: input.productKind,
     event_id: input.eventId,
@@ -213,7 +213,7 @@ export async function logPaddleTransaction(
     raw_custom_data: input.rawCustom,
   });
   if (error && !String(error.message).toLowerCase().includes('duplicate')) {
-    console.error('logPaddleTransaction', error);
+    console.error('logBillingTransaction', error);
   }
 }
 
@@ -227,16 +227,17 @@ async function upsertActiveSubscription(
   admin: SupabaseClient,
   userId: string,
   tier: QuiloraTier,
-  paddleCustomerId: string | null,
-  paddleSubscriptionId: string | null,
+  billingCustomerId: string | null,
+  billingSubscriptionId: string | null,
 ) {
   await admin.from('subscriptions').delete().eq('user_id', userId);
   await admin.from('subscriptions').insert({
     user_id: userId,
     tier,
     status: 'active',
-    paddle_customer_id: paddleCustomerId,
-    paddle_subscription_id: paddleSubscriptionId,
+    billing_customer_id: billingCustomerId,
+    billing_subscription_id: billingSubscriptionId,
+    billing_provider: 'legacy_checkout',
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   });
@@ -257,10 +258,10 @@ export async function handleTransactionCompleted(
   const { userId, productKind, providerEventId, customerEmail, paddleTransactionId, paddleCustomerId, rawCustom } =
     params;
 
-  await logPaddleTransaction(admin, {
+  await logBillingTransaction(admin, {
     userId,
-    paddleTransactionId,
-    paddleCustomerId,
+    externalTransactionId: paddleTransactionId,
+    externalCustomerId: paddleCustomerId,
     customerEmail,
     productKind,
     eventId: providerEventId,
@@ -298,7 +299,7 @@ export async function handleTransactionCompleted(
       amount: 200,
       eventType: 'boost_pack_purchase',
       idempotencyKey: `boost_${providerEventId}`,
-      metadata: { provider: 'paddle' },
+      metadata: { provider: 'legacy_checkout' },
     });
     return;
   }
@@ -343,7 +344,7 @@ type OrphanTx = {
   id: string;
   customer_email: string | null;
   created_at: string;
-  paddle_transaction_id: string | null;
+  external_transaction_id: string | null;
   recovery_stage: number | null;
   support_alert_7d_sent_at: string | null;
   auto_refund_30d_at: string | null;
@@ -351,23 +352,47 @@ type OrphanTx = {
 
 async function attemptRefundRecorded(
   admin: SupabaseClient,
-  paddleTransactionId: string,
+  externalTransactionId: string,
   reason: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const tid = paddleTransactionId.trim().startsWith('txn_')
-    ? paddleTransactionId.trim()
-    : `txn_${paddleTransactionId.trim()}`;
+  const dedupKey = externalTransactionId.trim();
   const { data: dup } = await admin
     .from('billing_refund_attempts')
     .select('id')
-    .eq('paddle_transaction_id', tid)
+    .eq('external_transaction_id', dedupKey)
     .eq('reason', reason)
     .maybeSingle();
   if (dup) return { ok: true };
-  const r = await paddleCreateFullRefund(tid, reason);
+
+  if (dedupKey.startsWith('txn_')) {
+    await admin.from('billing_refund_attempts').insert({
+      external_transaction_id: dedupKey,
+      reason,
+      status: 'skipped_legacy_provider',
+      http_status: null,
+      response_excerpt: 'legacy_txn_requires_manual_refund',
+    });
+    await enqueueEmail(admin, 'email_support_billing_refund_manual', 'support@quilora.com', {
+      external_transaction_id: dedupKey,
+      reason,
+      note: 'Historical txn_* id — process refund in the original payment provider dashboard if still applicable.',
+    });
+    return { ok: false, error: 'legacy_txn_manual_refund' };
+  }
+
+  if (!isLikelyPolarOrderId(dedupKey)) {
+    await enqueueEmail(admin, 'email_support_billing_refund_manual', 'support@quilora.com', {
+      external_transaction_id: dedupKey,
+      reason,
+      note: 'Unrecognized external transaction id for automated Polar refund.',
+    });
+    return { ok: false, error: 'unrecognized_external_id' };
+  }
+
+  const r = await createPolarFullRefund(dedupKey, reason);
   if (r.ok) {
     await admin.from('billing_refund_attempts').insert({
-      paddle_transaction_id: tid,
+      external_transaction_id: dedupKey,
       reason,
       status: 'submitted',
       http_status: r.status,
@@ -376,28 +401,28 @@ async function attemptRefundRecorded(
     return { ok: true };
   }
   await admin.from('billing_refund_attempts').insert({
-    paddle_transaction_id: tid,
+    external_transaction_id: dedupKey,
     reason,
     status: 'failed',
     http_status: r.status ?? null,
     response_excerpt: r.error.slice(0, 500),
   });
-  await enqueueEmail(admin, 'email_support_paddle_refund_failed', 'support@quilora.com', {
-    paddle_transaction_id: tid,
+  await enqueueEmail(admin, 'email_support_billing_refund_failed', 'support@quilora.com', {
+    external_transaction_id: dedupKey,
     reason,
     detail: r.error,
   });
   return { ok: false, error: r.error };
 }
 
-/** EC-04 — recovery cadence (6h / 24h), 7d support alert, 30d Paddle refund; plus email outbox drain. */
+/** EC-04 — recovery cadence (6h / 24h), 7d support alert, 30d automated refund where supported; plus email outbox drain. */
 export async function reconcileOrphanPayments(admin: SupabaseClient) {
   await processEmailOutboxBatch(admin, 10);
 
   const { data: orphans } = await admin
-    .from('paddle_transactions')
+    .from('billing_transactions')
     .select(
-      'id, customer_email, created_at, paddle_transaction_id, recovery_stage, support_alert_7d_sent_at, auto_refund_30d_at',
+      'id, customer_email, created_at, external_transaction_id, recovery_stage, support_alert_7d_sent_at, auto_refund_30d_at',
     )
     .is('user_id', null)
     .eq('reconciled', false)
@@ -410,7 +435,7 @@ export async function reconcileOrphanPayments(admin: SupabaseClient) {
     if (em) {
       const { data: prof } = await admin.from('profiles').select('id').ilike('email', em).maybeSingle();
       if (prof?.id) {
-        await admin.from('paddle_transactions').update({ user_id: prof.id, reconciled: true }).eq('id', r.id);
+        await admin.from('billing_transactions').update({ user_id: prof.id, reconciled: true }).eq('id', r.id);
         continue;
       }
     }
@@ -426,7 +451,7 @@ export async function reconcileOrphanPayments(admin: SupabaseClient) {
         });
       }
       await admin
-        .from('paddle_transactions')
+        .from('billing_transactions')
         .update({ recovery_stage: 1, recovery_last_sent_at: new Date().toISOString() })
         .eq('id', r.id);
       continue;
@@ -438,7 +463,7 @@ export async function reconcileOrphanPayments(admin: SupabaseClient) {
         });
       }
       await admin
-        .from('paddle_transactions')
+        .from('billing_transactions')
         .update({ recovery_stage: 2, recovery_last_sent_at: new Date().toISOString() })
         .eq('id', r.id);
       continue;
@@ -450,7 +475,7 @@ export async function reconcileOrphanPayments(admin: SupabaseClient) {
         note: 'EC-04: unclaimed payment after 7 days — manual outreach.',
       });
       await admin
-        .from('paddle_transactions')
+        .from('billing_transactions')
         .update({
           recovery_stage: Math.max(stage, 3),
           support_alert_7d_sent_at: new Date().toISOString(),
@@ -458,11 +483,11 @@ export async function reconcileOrphanPayments(admin: SupabaseClient) {
         .eq('id', r.id);
       continue;
     }
-    const pid = String(r.paddle_transaction_id ?? '');
+    const pid = String(r.external_transaction_id ?? '');
     if (ageH >= 30 * 24 && pid && !r.auto_refund_30d_at) {
       const res = await attemptRefundRecorded(admin, pid, 'ec04_orphan_30d');
       await admin
-        .from('paddle_transactions')
+        .from('billing_transactions')
         .update({
           auto_refund_30d_at: new Date().toISOString(),
           auto_refund_30d_error: res.ok ? null : res.error.slice(0, 500),
@@ -502,20 +527,20 @@ export async function runNinetyDayRefundCheck(admin: SupabaseClient) {
       userId: p.id,
       tier: p.tier,
       message:
-        'We have not reached public launch within 90 days. A full refund is being processed automatically via Paddle (EC-08).',
+        'We have not reached public launch within 90 days. A full refund is being processed automatically where your payment provider supports it (EC-08).',
     });
   }
 
   const payerIds = (payers ?? []).map((p) => p.id as string).filter(Boolean);
   if (payerIds.length > 0) {
     const { data: txs } = await admin
-      .from('paddle_transactions')
-      .select('paddle_transaction_id, user_id')
+      .from('billing_transactions')
+      .select('external_transaction_id, user_id')
       .in('user_id', payerIds)
-      .not('paddle_transaction_id', 'is', null);
+      .not('external_transaction_id', 'is', null);
     const seen = new Set<string>();
     for (const t of txs ?? []) {
-      const pid = String((t as { paddle_transaction_id?: string }).paddle_transaction_id ?? '');
+      const pid = String((t as { external_transaction_id?: string }).external_transaction_id ?? '');
       if (!pid || seen.has(pid)) continue;
       seen.add(pid);
       await attemptRefundRecorded(admin, pid, 'ec08_ninety_day_no_launch');
@@ -554,15 +579,16 @@ export async function cancelPrelaunchBookwormSage(admin: SupabaseClient, userId:
 
   const { data: sub } = await admin
     .from('subscriptions')
-    .select('paddle_subscription_id')
+    .select('billing_subscription_id, billing_provider')
     .eq('user_id', userId)
     .eq('status', 'active')
     .maybeSingle();
-  const subId = sub?.paddle_subscription_id as string | undefined;
-  if (subId) {
-    const c = await paddleCancelSubscriptionImmediately(subId);
+  const subId = sub?.billing_subscription_id as string | undefined;
+  const provider = String((sub as { billing_provider?: string } | null)?.billing_provider ?? '');
+  if (subId && provider === 'polar') {
+    const c = await revokePolarSubscription(subId);
     if (!c.ok) {
-      await enqueueEmail(admin, 'email_support_paddle_cancel_failed', 'support@quilora.com', {
+      await enqueueEmail(admin, 'email_support_billing_cancel_failed', 'support@quilora.com', {
         userId,
         subscriptionId: subId,
         detail: c.error,
@@ -571,14 +597,14 @@ export async function cancelPrelaunchBookwormSage(admin: SupabaseClient, userId:
   }
 
   const { data: lastTx } = await admin
-    .from('paddle_transactions')
-    .select('paddle_transaction_id')
+    .from('billing_transactions')
+    .select('external_transaction_id')
     .eq('user_id', userId)
-    .not('paddle_transaction_id', 'is', null)
+    .not('external_transaction_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
-  const ptx = lastTx?.paddle_transaction_id as string | undefined;
+  const ptx = lastTx?.external_transaction_id as string | undefined;
   if (ptx) {
     await attemptRefundRecorded(admin, ptx, 'ec07_prelaunch_self_cancel');
   }
@@ -604,26 +630,26 @@ export async function cancelPrelaunchBookwormSage(admin: SupabaseClient, userId:
   return { ok: true as const };
 }
 
-/** EC-05 — ops: attach an orphan `paddle_transactions` row to an existing Supabase user. */
+/** EC-05 — ops: attach an orphan `billing_transactions` row to an existing Supabase user. */
 export async function adminLinkOrphanPayment(
   admin: SupabaseClient,
   input: { transactionRowId: string; targetUserId: string; actor?: string },
 ) {
-  const { data: tx } = await admin.from('paddle_transactions').select('id, user_id').eq('id', input.transactionRowId).maybeSingle();
+  const { data: tx } = await admin.from('billing_transactions').select('id, user_id').eq('id', input.transactionRowId).maybeSingle();
   if (!tx || (tx as { user_id?: string }).user_id) {
     return { ok: false as const, error: 'INVALID_OR_ALREADY_LINKED' };
   }
   const { data: prof } = await admin.from('profiles').select('id').eq('id', input.targetUserId).maybeSingle();
   if (!prof) return { ok: false as const, error: 'USER_NOT_FOUND' };
   await admin
-    .from('paddle_transactions')
+    .from('billing_transactions')
     .update({ user_id: input.targetUserId, reconciled: true })
     .eq('id', input.transactionRowId);
   await admin.from('billing_admin_actions').insert({
     action: 'link_orphan_payment',
     actor: input.actor ?? 'admin',
     user_id: input.targetUserId,
-    payload: { paddle_transaction_row: input.transactionRowId },
+    payload: { billing_transaction_row: input.transactionRowId },
   });
   return { ok: true as const };
 }
@@ -634,15 +660,15 @@ export async function cancelGenesisReleaseSeat(admin: SupabaseClient, userId: st
   await releaseGenesisSlot(admin, pp === '119' ? 'genesis_119' : 'genesis_80');
 
   const { data: genesisTxs } = await admin
-    .from('paddle_transactions')
-    .select('paddle_transaction_id, product_kind')
+    .from('billing_transactions')
+    .select('external_transaction_id, product_kind')
     .eq('user_id', userId)
     .in('product_kind', ['genesis_80', 'genesis_119'])
-    .not('paddle_transaction_id', 'is', null)
+    .not('external_transaction_id', 'is', null)
     .order('created_at', { ascending: false })
     .limit(3);
   for (const t of genesisTxs ?? []) {
-    const pid = String((t as { paddle_transaction_id?: string }).paddle_transaction_id ?? '');
+    const pid = String((t as { external_transaction_id?: string }).external_transaction_id ?? '');
     if (pid) {
       await attemptRefundRecorded(admin, pid, 'ec07_genesis_seat_release');
     }

@@ -10,13 +10,13 @@ export function RefundPolicyBody() {
       <LegalSectionCard id="section-1" title="1. Introduction">
         <LegalParagraph>
           This Refund Policy explains how subscription charges, Boost Pack purchases, and Genesis Account purchases may be refunded, and how failed AI actions affect credits. It should be read together with our{' '}
-          <Link to="/payments">Payments and Subscriptions Agreement</Link> and <Link to="/terms">Terms of Service</Link>. Our order process is conducted by our online reseller Paddle.com, which is the Merchant of Record for all orders and handles payment-related returns.
+          <Link to="/payments">Payments and Subscriptions Agreement</Link> and <Link to="/terms">Terms of Service</Link>. Our order process is conducted by our online reseller Polar, which is the Merchant of Record for all orders and handles payment-related returns.
         </LegalParagraph>
       </LegalSectionCard>
 
-      <LegalSectionCard id="section-2" title="2. Paddle as Merchant of Record">
+      <LegalSectionCard id="section-2" title="2. Polar as Merchant of Record">
         <LegalParagraph>
-          Quilora&apos;s refund policy complies with Paddle&apos;s reseller terms and applicable consumer protection law. Approved refunds are processed by Paddle and may take 5–10 business days to appear on your statement.
+          Quilora&apos;s refund policy complies with Polar&apos;s reseller terms and applicable consumer protection law. Approved refunds are processed by Polar and may take 5–10 business days to appear on your statement.
         </LegalParagraph>
       </LegalSectionCard>
 
@@ -26,7 +26,7 @@ export function RefundPolicyBody() {
           <a href={mail} className="font-semibold text-[#7bbdf3] underline underline-offset-2 hover:text-white">
             {QUILORA_CONTACT_EMAIL}
           </a>{' '}
-          with your Paddle order number and a description of the issue.
+          with your Polar order number and a description of the issue.
         </LegalParagraph>
       </LegalSectionCard>
 
@@ -69,9 +69,9 @@ export function RefundPolicyBody() {
           Initiating a chargeback without first contacting Quilora may result in account suspension. We reserve the right to contest chargebacks where the charge was valid and the Services were used.
         </LegalParagraph>
         <LegalParagraph>
-          For disputes related to the payment transaction itself, you may also contact Paddle&apos;s support as Merchant of Record:{' '}
-          <a href="https://www.paddle.com/help" className="font-semibold text-[#7bbdf3] underline underline-offset-2 hover:text-white">
-            https://www.paddle.com/help
+          For disputes related to the payment transaction itself, you may also contact Polar&apos;s support as Merchant of Record:{' '}
+          <a href="https://polar.sh/docs" className="font-semibold text-[#7bbdf3] underline underline-offset-2 hover:text-white">
+            https://polar.sh/docs
           </a>
           .
         </LegalParagraph>

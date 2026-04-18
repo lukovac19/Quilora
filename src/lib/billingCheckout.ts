@@ -1,16 +1,9 @@
 import { quiloraPublicAppUrl } from './billing/polar';
+// Checkout redirect URLs are derived from `quiloraPublicAppUrl()` → TODO_APP_URL (`VITE_APP_URL`).
 import type { InternalPlanKey } from './billing/types';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from './quiloraEdge';
 import { scheduleWebhookDelayWatchAfterCheckout } from './postCheckoutWebhookDelayWatch';
 import { supabase } from './supabase';
-
-/** Includes legacy Paddle product ids still referenced in a few UI call sites. */
-export type CheckoutProductKey =
-  | InternalPlanKey
-  | 'genesis_80'
-  | 'genesis_119'
-  | 'bibliophile_monthly'
-  | 'bibliophile_yearly';
 
 export type GenesisInventory = {
   genesis80: { sold: number; cap: number; remaining: number };
@@ -79,7 +72,8 @@ export async function openPlanCheckout(params: PlanCheckoutParams): Promise<Open
     }
   }
 
-  const appUrl = quiloraPublicAppUrl();
+  const appUrl = quiloraPublicAppUrl(); // TODO_APP_URL
+  // Polar success redirect — `{CHECKOUT_ID}` is substituted by Polar at redirect time.
   const successUrl = `${appUrl}/billing/success?checkout_id={CHECKOUT_ID}`;
   const returnUrl = `${appUrl}/pricing?checkout=cancelled`;
 
@@ -118,54 +112,11 @@ export async function openPlanCheckout(params: PlanCheckoutParams): Promise<Open
   }
 }
 
-function mapLegacyProductKey(product: CheckoutProductKey): {
-  planKey: InternalPlanKey;
-  genesisSlotPricePoint?: '80' | '119' | null;
-} {
-  switch (product) {
-    case 'bibliophile_monthly':
-      return { planKey: 'sage_monthly' };
-    case 'bibliophile_yearly':
-      return { planKey: 'sage_yearly' };
-    case 'genesis_80':
-      return { planKey: 'genesis_lifetime', genesisSlotPricePoint: '80' };
-    case 'genesis_119':
-      return { planKey: 'genesis_lifetime', genesisSlotPricePoint: '119' };
-    default:
-      return { planKey: product as InternalPlanKey };
-  }
-}
-
-type LegacyOpenCheckoutParams = {
-  product: CheckoutProductKey;
-  userId: string;
-  email?: string | null;
-  onCheckoutCompleted?: (product: CheckoutProductKey) => void;
-};
-
-/** Back-compat entry point: maps legacy `product` ids to Polar `planKey` and starts redirect checkout. */
-export async function openPaddleCheckout(params: LegacyOpenCheckoutParams): Promise<OpenCheckoutResult> {
-  const email = String(params.email ?? '').trim();
-  if (!email) return { ok: false, reason: 'not_configured', message: 'Email required for checkout.' };
-  const { planKey, genesisSlotPricePoint } = mapLegacyProductKey(params.product);
-  return openPlanCheckout({
-    planKey,
-    userId: params.userId,
-    email,
-    afterSuccessNavigate: params.onCheckoutCompleted ? '/onboarding' : undefined,
-    genesisSlotPricePoint: genesisSlotPricePoint ?? null,
-  });
-}
-
 /** Polar checkout is always server-configured; “not configured” is returned as a failed openPlanCheckout result. */
 export function polarCheckoutConfigured(): boolean {
   return true;
 }
 
-export function paddleClientConfigured(): boolean {
-  return polarCheckoutConfigured();
-}
-
-export function priceConfigured(_product: CheckoutProductKey): boolean {
+export function priceConfigured(_planKey: InternalPlanKey): boolean {
   return true;
 }

@@ -14,7 +14,7 @@ import {
   setPlanSelectionCompleted,
   setTier,
 } from './credit_service.ts';
-import { reserveGenesisSlot, type GenesisTier } from './paddle_service.ts';
+import { reserveGenesisSlot, type GenesisTier } from './genesis_inventory_service.ts';
 import { polarApiJson } from './polar_api.ts';
 import { isPolarPlanKey, planKeyFromPolarProductId, polarProductIdForPlan, type PolarPlanKey } from './polar_plan.ts';
 
@@ -45,6 +45,7 @@ export function mapPolarSubscriptionStatus(raw: string | null | undefined): 'act
 }
 
 export function verifyPolarWebhook(rawBody: string, headers: Headers): Record<string, unknown> {
+  // TODO_POLAR_WEBHOOK_SECRET — Polar webhook endpoint signing secret → Supabase Edge secret POLAR_WEBHOOK_SECRET
   const secret = Deno.env.get('POLAR_WEBHOOK_SECRET')?.trim();
   if (!secret) throw new Error('POLAR_WEBHOOK_SECRET missing');
   const wh = new Webhook(secret);
@@ -76,10 +77,10 @@ export async function markPolarEventError(admin: SupabaseClient, polarEventId: s
   await admin.from('polar_webhook_events').update({ processing_error: message.slice(0, 2000) }).eq('polar_event_id', polarEventId);
 }
 
-async function upsertCustomerProfile(admin: SupabaseClient, userId: string, polarCustomerId: string | null) {
-  if (!polarCustomerId) return;
+async function upsertCustomerProfile(admin: SupabaseClient, userId: string, billingCustomerId: string | null) {
+  if (!billingCustomerId) return;
   await admin.from('customer_billing_profiles').upsert(
-    { user_id: userId, polar_customer_id: polarCustomerId, updated_at: new Date().toISOString() },
+    { user_id: userId, billing_customer_id: billingCustomerId, updated_at: new Date().toISOString() },
     { onConflict: 'user_id' },
   );
 }
@@ -90,9 +91,9 @@ async function upsertPolarSubscriptionRow(
     userId: string;
     tier: QuiloraTier;
     planKey: PolarPlanKey;
-    polarCustomerId: string | null;
-    polarSubscriptionId: string | null;
-    polarProductId: string | null;
+    billingCustomerId: string | null;
+    billingSubscriptionId: string | null;
+    billingProductId: string | null;
     status: 'active' | 'cancelled' | 'past_due' | 'incomplete' | 'unpaid';
     cancelAtPeriodEnd: boolean;
     currentPeriodStart: string | null;
@@ -105,11 +106,9 @@ async function upsertPolarSubscriptionRow(
     user_id: input.userId,
     tier: input.tier,
     status: input.status,
-    paddle_subscription_id: null,
-    paddle_customer_id: null,
-    polar_customer_id: input.polarCustomerId,
-    polar_subscription_id: input.polarSubscriptionId,
-    polar_product_id: input.polarProductId,
+    billing_customer_id: input.billingCustomerId,
+    billing_subscription_id: input.billingSubscriptionId,
+    billing_product_id: input.billingProductId,
     internal_plan_key: input.planKey,
     is_lifetime: input.isLifetime,
     cancel_at_period_end: input.cancelAtPeriodEnd,
@@ -159,9 +158,9 @@ export async function fulfillPolarOrder(admin: SupabaseClient, data: Record<stri
   if (orderId) {
     const { error } = await admin.from('billing_orders').insert({
       user_id: userId,
-      polar_order_id: orderId,
+      provider_order_id: orderId,
       internal_plan_key: planKey,
-      polar_product_id: productId,
+      provider_product_id: productId,
     });
     if (error && String(error.code) !== '23505') console.warn('billing_orders insert', error);
   }
@@ -180,9 +179,9 @@ export async function fulfillPolarOrder(admin: SupabaseClient, data: Record<stri
       userId,
       tier: 'genesis',
       planKey: 'genesis_lifetime',
-      polarCustomerId: readString(data, 'customer_id') ?? readString(asRecord(data.customer) ?? null, 'id'),
-      polarSubscriptionId: null,
-      polarProductId: productId,
+      billingCustomerId: readString(data, 'customer_id') ?? readString(asRecord(data.customer) ?? null, 'id'),
+      billingSubscriptionId: null,
+      billingProductId: productId,
       status: 'active',
       cancelAtPeriodEnd: false,
       currentPeriodStart: null,
@@ -206,9 +205,9 @@ export async function fulfillPolarOrder(admin: SupabaseClient, data: Record<stri
       userId,
       tier,
       planKey,
-      polarCustomerId: readString(data, 'customer_id') ?? readString(asRecord(data.customer) ?? null, 'id'),
-      polarSubscriptionId: null,
-      polarProductId: productId,
+      billingCustomerId: readString(data, 'customer_id') ?? readString(asRecord(data.customer) ?? null, 'id'),
+      billingSubscriptionId: null,
+      billingProductId: productId,
       status: 'active',
       cancelAtPeriodEnd: false,
       currentPeriodStart: null,
@@ -262,8 +261,8 @@ export async function fulfillPolarSubscription(
   const cancelAtPeriodEnd = Boolean(data['cancel_at_period_end'] ?? data['cancelAtPeriodEnd']);
   const currentPeriodStart = readString(data, 'current_period_start') ?? readString(data, 'currentPeriodStart');
   const currentPeriodEnd = readString(data, 'current_period_end') ?? readString(data, 'currentPeriodEnd');
-  const polarCustomerId = readString(data, 'customer_id') ?? readString(asRecord(data.customer) ?? null, 'id');
-  const polarSubscriptionId = readString(data, 'id');
+  const billingCustomerId = readString(data, 'customer_id') ?? readString(asRecord(data.customer) ?? null, 'id');
+  const billingSubscriptionId = readString(data, 'id');
 
   const prev = await getProfile(admin, userId);
   const prevTier = (prev?.tier as QuiloraTier | undefined) ?? 'bookworm';
@@ -281,9 +280,9 @@ export async function fulfillPolarSubscription(
     userId,
     tier,
     planKey,
-    polarCustomerId,
-    polarSubscriptionId,
-    polarProductId: productId,
+    billingCustomerId,
+    billingSubscriptionId,
+    billingProductId: productId,
     status: effectiveStatus,
     cancelAtPeriodEnd,
     currentPeriodStart,
@@ -303,15 +302,15 @@ export async function fulfillPolarSubscription(
 
   await markPrelaunchPurchaseProfile(admin, userId);
   await setPlanSelectionCompleted(admin, userId, true);
-  await upsertCustomerProfile(admin, userId, polarCustomerId);
+  await upsertCustomerProfile(admin, userId, billingCustomerId);
 }
 
 export async function handlePolarCustomerStateChanged(admin: SupabaseClient, data: Record<string, unknown>) {
   const cust = asRecord(data.customer) ?? data;
-  const polarCustomerId = readString(cust, 'id');
+  const billingCustomerId = readString(cust, 'id');
   const externalId = readString(cust, 'external_id');
-  if (!polarCustomerId || !externalId) return;
-  await upsertCustomerProfile(admin, externalId, polarCustomerId);
+  if (!billingCustomerId || !externalId) return;
+  await upsertCustomerProfile(admin, externalId, billingCustomerId);
 }
 
 export async function processPolarWebhookEnvelope(admin: SupabaseClient, body: Record<string, unknown>, polarEventId: string) {
@@ -383,15 +382,15 @@ async function fulfillFromCheckout(admin: SupabaseClient, data: Record<string, u
 
   const tier = tierFromPlanKey(resolvedPlan);
   await setTier(admin, userId, tier);
-  const polarCustomerId = readString(asRecord(data.customer) ?? null, 'id');
-  const polarSubscriptionId = readString(data, 'subscription_id') ?? readString(asRecord(data.subscription) ?? null, 'id');
+  const billingCustomerId = readString(asRecord(data.customer) ?? null, 'id');
+  const billingSubscriptionId = readString(data, 'subscription_id') ?? readString(asRecord(data.subscription) ?? null, 'id');
   await upsertPolarSubscriptionRow(admin, {
     userId,
     tier,
     planKey: resolvedPlan,
-    polarCustomerId,
-    polarSubscriptionId,
-    polarProductId: productId,
+    billingCustomerId,
+    billingSubscriptionId,
+    billingProductId: productId,
     status: 'active',
     cancelAtPeriodEnd: false,
     currentPeriodStart: null,
@@ -456,6 +455,20 @@ export async function fetchPolarCheckout(checkoutId: string): Promise<Record<str
   return polarApiJson<Record<string, unknown>>('GET', `/v1/checkouts/${encodeURIComponent(checkoutId)}`, undefined);
 }
 
+function subscriptionRowGrantsPaidSeatServer(row: Record<string, unknown> | null): boolean {
+  if (!row) return false;
+  const st = String(row['status'] ?? '');
+  const endRaw = row['current_period_end'] as string | null | undefined;
+  const end = endRaw ? new Date(endRaw).getTime() : null;
+  const now = Date.now();
+  if (Boolean(row['is_lifetime']) && st === 'active') return true;
+  if (st === 'active' || st === 'past_due') return true;
+  if (st === 'cancelled' && Boolean(row['cancel_at_period_end']) && end !== null && !Number.isNaN(end) && end > now) {
+    return true;
+  }
+  return false;
+}
+
 export async function buildPolarBillingMe(admin: SupabaseClient, userId: string) {
   const entitlements = await getTierEntitlements(admin, userId);
   const lowBalance = await getLowBalanceStatus(admin, userId);
@@ -465,15 +478,27 @@ export async function buildPolarBillingMe(admin: SupabaseClient, userId: string)
     .eq('user_id', userId)
     .order('updated_at', { ascending: false })
     .limit(1);
-  const sub = subRows?.[0] ?? null;
-  const { data: cbp } = await admin.from('customer_billing_profiles').select('polar_customer_id').eq('user_id', userId).maybeSingle();
-  const portalAvailable = Boolean(sub && (sub as { billing_provider?: string }).billing_provider === 'polar');
+  const sub = (subRows?.[0] ?? null) as Record<string, unknown> | null;
+  const { data: cbp } = await admin.from('customer_billing_profiles').select('billing_customer_id').eq('user_id', userId).maybeSingle();
+  const billingCustomerId = (cbp as { billing_customer_id?: string } | null)?.billing_customer_id ?? null;
+  const portalAvailable = Boolean(sub && String(sub['billing_provider'] ?? '') === 'polar');
+  const activeAccess = subscriptionRowGrantsPaidSeatServer(sub);
+  const currentPlanKey = typeof sub?.['internal_plan_key'] === 'string' ? (sub['internal_plan_key'] as string) : null;
   return {
     entitlements,
     lowBalance,
     subscription: sub,
-    polarCustomerId: (cbp as { polar_customer_id?: string } | null)?.polar_customer_id ?? null,
+    billingCustomerId,
     portalAvailable,
+    currentPlanKey,
+    tier: entitlements.tier,
+    provider: sub ? String(sub['billing_provider'] ?? 'unknown') : 'unknown',
+    isLifetime: Boolean(sub?.['is_lifetime']),
+    subscriptionStatus: sub ? String(sub['status'] ?? '') : null,
+    activeAccess,
+    cancelAtPeriodEnd: Boolean(sub?.['cancel_at_period_end']),
+    currentPeriodEnd: (sub?.['current_period_end'] as string | null | undefined) ?? null,
+    canManageBilling: portalAvailable && Boolean(billingCustomerId),
   };
 }
 

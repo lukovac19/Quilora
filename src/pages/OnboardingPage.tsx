@@ -334,7 +334,7 @@ export function OnboardingPage() {
                 </p>
                 <p className="text-sm leading-relaxed text-white/45">
                   Your plan starts on launch day. If Quilora doesn&apos;t reach public launch (full canvas access for paid
-                  users) within 90 days of your purchase, you&apos;ll receive a full refund automatically via Paddle.
+                  users) within 90 days of your purchase, you&apos;ll receive a full refund automatically when your payment provider supports it.
                 </p>
                 {user?.profileTier === 'genesis' || user?.genesisBadge ? (
                   <p className="text-sm leading-relaxed text-white/45">

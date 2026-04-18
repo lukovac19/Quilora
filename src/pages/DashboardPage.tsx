@@ -59,7 +59,7 @@ export function DashboardPage() {
       return;
     }
     await quiloraEdgePostJson(`${QUILORA_EDGE_SLUG}/billing/cancel-prelaunch`, token, {});
-    showToast('Cancellation recorded. Refund completes via Paddle.', 'success');
+    showToast('Cancellation recorded. Refund completes via your payment provider.', 'success');
     await refreshAuthUser();
     await refreshLaunchState();
   }, [showToast, refreshAuthUser, refreshLaunchState]);

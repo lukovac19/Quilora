@@ -4,13 +4,13 @@ import { Check, Info } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useApp } from '../../context/AppContext';
 import {
-  openPaddleCheckout,
+  openPlanCheckout,
   fetchGenesisInventory,
   isGenesisSoldOut,
   lifetimeDealSeatsRemaining,
-  type CheckoutProductKey,
   type GenesisInventory,
 } from '../../lib/billingCheckout';
+import type { InternalPlanKey } from '../../lib/billing/types';
 import { markGenesisChoiceFlowPending } from '../../lib/genesisEarlyAccessSession';
 import { assertPrelaunchCheckoutAllowed } from '../../lib/prelaunchPurchaseGuards';
 import { DuplicatePrelaunchPurchaseModal } from '../prelaunch/DuplicatePrelaunchPurchaseModal';
@@ -20,7 +20,7 @@ export type PricingPlansBlockProps = {
   /** Early access: Monthly/Yearly toggle and plan cards only (no genesis banner, tax line, comparison table). */
   earlyAccessPricing?: boolean;
   /** When checkout cannot open (e.g. dev without secrets), optional fallback callback. */
-  onCheckoutCompleted?: (product: CheckoutProductKey) => void;
+  onCheckoutCompleted?: (product: InternalPlanKey) => void;
 };
 
 /** Shared Bookworm · Sage · Genesis grid — used on /pricing and landing (#pricing) to stay in sync. */
@@ -68,31 +68,28 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     navigate('/auth?mode=signup');
   }, [navigate]);
 
-  const completedOpt = useMemo(() => {
-    if (onCheckoutCompleted) return { onCheckoutCompleted };
-    return {} as { onCheckoutCompleted?: (p: CheckoutProductKey) => void };
-  }, [onCheckoutCompleted]);
+  const afterNav = onCheckoutCompleted ? '/onboarding' : undefined;
 
   const runCheckoutSubscription = useCallback(async () => {
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
       return;
     }
-    const yearlyKey: CheckoutProductKey = 'bookworm_yearly';
-    const monthlyKey: CheckoutProductKey = 'bookworm_monthly';
+    const yearlyKey: InternalPlanKey = 'bookworm_yearly';
+    const monthlyKey: InternalPlanKey = 'bookworm_monthly';
     const primary = displayedBilling ? yearlyKey : monthlyKey;
-    let res = await openPaddleCheckout({
-      product: primary,
+    let res = await openPlanCheckout({
+      planKey: primary,
       userId: user.id,
       email: user.email,
-      ...completedOpt,
+      afterSuccessNavigate: afterNav,
     });
     if (!res.ok && displayedBilling && primary !== monthlyKey) {
-      res = await openPaddleCheckout({
-        product: monthlyKey,
+      res = await openPlanCheckout({
+        planKey: monthlyKey,
         userId: user.id,
         email: user.email,
-        ...completedOpt,
+        afterSuccessNavigate: afterNav,
       });
     }
     if (!res.ok && res.reason === 'sold_out') {
@@ -109,19 +106,29 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
+  }, [user, displayedBilling, navigate, handleGetStarted, afterNav, onCheckoutCompleted]);
 
   const runBibliophileCheckout = useCallback(async () => {
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
       return;
     }
-    const yearlyKey: CheckoutProductKey = 'sage_yearly';
-    const monthlyKey: CheckoutProductKey = 'sage_monthly';
+    const yearlyKey: InternalPlanKey = 'sage_yearly';
+    const monthlyKey: InternalPlanKey = 'sage_monthly';
     const primary = displayedBilling ? yearlyKey : monthlyKey;
-    let res = await openPaddleCheckout({ product: primary, userId: user.id, email: user.email, ...completedOpt });
+    let res = await openPlanCheckout({
+      planKey: primary,
+      userId: user.id,
+      email: user.email,
+      afterSuccessNavigate: afterNav,
+    });
     if (!res.ok && displayedBilling && primary !== monthlyKey) {
-      res = await openPaddleCheckout({ product: monthlyKey, userId: user.id, email: user.email, ...completedOpt });
+      res = await openPlanCheckout({
+        planKey: monthlyKey,
+        userId: user.id,
+        email: user.email,
+        afterSuccessNavigate: afterNav,
+      });
     }
     if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
@@ -133,7 +140,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
+  }, [user, displayedBilling, navigate, handleGetStarted, afterNav, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
     if (!user?.id) {
@@ -152,16 +159,16 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       setDupModal({ open: true, message: gate.message });
       return;
     }
-    const product: CheckoutProductKey = displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly';
+    const product: InternalPlanKey = displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly';
     if (import.meta.env.DEV) {
       onCheckoutCompleted?.(product);
       return;
     }
-    const res = await openPaddleCheckout({
-      product,
+    const res = await openPlanCheckout({
+      planKey: product,
       userId: checkoutUserId,
       email: checkoutEmail,
-      ...completedOpt,
+      afterSuccessNavigate: afterNav,
     });
     if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
@@ -173,7 +180,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
+  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate, toast]);
 
   const lockEarlySage = useCallback(async () => {
     if (!user?.id) {
@@ -192,16 +199,16 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       setDupModal({ open: true, message: gate.message });
       return;
     }
-    const product: CheckoutProductKey = displayedBilling ? 'sage_yearly' : 'sage_monthly';
+    const product: InternalPlanKey = displayedBilling ? 'sage_yearly' : 'sage_monthly';
     if (import.meta.env.DEV) {
       onCheckoutCompleted?.(product);
       return;
     }
-    const res = await openPaddleCheckout({
-      product,
+    const res = await openPlanCheckout({
+      planKey: product,
       userId: checkoutUserId,
       email: checkoutEmail,
-      ...completedOpt,
+      afterSuccessNavigate: afterNav,
     });
     if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
@@ -213,7 +220,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
+  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate, toast]);
 
   const claimGenesisSeatEarly = useCallback(() => {
     if (!user?.id) {
