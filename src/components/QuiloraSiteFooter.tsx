@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { Facebook, Instagram, Linkedin } from 'lucide-react';
-import { QUILORA_CONTACT_EMAIL, QUILORA_POSTAL_ADDRESS } from '../lib/siteContact';
+import { QUILORA_CONTACT_EMAIL } from '../lib/siteContact';
 
 type QuiloraSiteFooterProps = {
   /** @deprecated No longer used; kept so existing call sites do not break. */
@@ -30,18 +30,6 @@ export function QuiloraSiteFooter({ className = '' }: QuiloraSiteFooterProps) {
         </div>
 
         <nav aria-label="Footer" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-          <Link to="/features" className={footerLinkClass}>
-            Features
-          </Link>
-          <Link to="/how-it-works" className={footerLinkClass}>
-            How it Works
-          </Link>
-          <Link to="/pricing" className={footerLinkClass}>
-            Pricing
-          </Link>
-          <Link to="/faq" className={footerLinkClass}>
-            FAQ
-          </Link>
           <Link to="/privacy" className={footerLinkClass}>
             Privacy Policy
           </Link>
@@ -51,15 +39,17 @@ export function QuiloraSiteFooter({ className = '' }: QuiloraSiteFooterProps) {
           <Link to="/refund-policy" className={footerLinkClass}>
             Refund Policy
           </Link>
+          <Link to="/about" className={footerLinkClass}>
+            About us
+          </Link>
         </nav>
 
-        <div className="max-w-xl space-y-1 text-sm leading-relaxed text-white/55">
+        <div className="max-w-xl text-sm leading-relaxed text-white/55">
           <p>
             <a href={`mailto:${QUILORA_CONTACT_EMAIL}`} className="text-white/70 underline-offset-4 transition-colors hover:text-white hover:underline">
               {QUILORA_CONTACT_EMAIL}
             </a>
           </p>
-          <p>{QUILORA_POSTAL_ADDRESS}</p>
         </div>
 
         <div className="flex items-center justify-center gap-3">

@@ -7,23 +7,24 @@ import {
 } from '../lib/siteContact';
 
 const TOC: LegalTocItem[] = [
-  { id: 'section-1', label: 'Section 1 — Introduction' },
-  { id: 'section-2', label: 'Section 2 — Merchant of record' },
-  { id: 'section-3', label: 'Section 3 — Default rule (digital services)' },
-  { id: 'section-4', label: 'Section 4 — EU / UK right of withdrawal' },
-  { id: 'section-5', label: 'Section 5 — Accidental renewals and mistaken charges' },
-  { id: 'section-6', label: 'Section 6 — Billing errors and access problems' },
-  { id: 'section-7', label: 'Section 7 — Cancellations and unused time' },
-  { id: 'section-8', label: 'Section 8 — Chargebacks' },
-  { id: 'section-9', label: 'Section 9 — Changes to this Policy' },
-  { id: 'section-10', label: 'Section 10 — Contact' },
+  { id: 'section-1', label: '1. Introduction' },
+  { id: 'section-2', label: '2. Paddle (MoR)' },
+  { id: 'section-3', label: '3. Subscription refunds' },
+  { id: 'section-4', label: '4. Boost Packs' },
+  { id: 'section-5', label: '5. Genesis' },
+  { id: 'section-6', label: '6. AI credit rollback' },
+  { id: 'section-7', label: '7. Consumer rights' },
+  { id: 'section-8', label: '8. Disputes' },
+  { id: 'section-9', label: '9. Cancellations' },
+  { id: 'section-10', label: '10. Changes' },
+  { id: 'section-11', label: '11. Contact' },
 ];
 
 export function RefundPolicyPage() {
   return (
     <LegalDocumentPage
       title="Refund Policy"
-      lastUpdatedLine="Last updated: April 17, 2026"
+      lastUpdatedLine="Last updated: April 18, 2026"
       effectiveDateLine={QUILORA_EFFECTIVE_DATE_LINE}
       heroSubtitle="When something goes wrong with a charge, here is how we think about fixes — fairly, predictably, and in plain language."
       toc={TOC}

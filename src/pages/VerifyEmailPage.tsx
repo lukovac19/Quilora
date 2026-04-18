@@ -8,6 +8,7 @@ import { markGenesisChoiceFlowPending } from '../lib/genesisEarlyAccessSession';
 const GENESIS_CHOICE_REDIRECT_PATH = '/early-access/genesis-choice';
 import { useApp } from '../context/AppContext';
 import { ModernNavbar } from '../components/ModernNavbar';
+import { QUILORA_CONTACT_EMAIL } from '../lib/siteContact';
 
 function parseHashParams(): Record<string, string> {
   const raw = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
@@ -141,8 +142,8 @@ export function VerifyEmailPage() {
             <p className="font-semibold text-[#0f172a]">Check your spam or junk folder</p>
             <p className="text-slate-700">
               Our confirmation emails sometimes land in spam. If you still see nothing after a few minutes, contact{' '}
-              <a href="mailto:support@quilora.com" className="font-medium text-[#266ba7] underline-offset-2 hover:underline">
-                support@quilora.com
+              <a href={`mailto:${QUILORA_CONTACT_EMAIL}`} className="font-medium text-[#266ba7] underline-offset-2 hover:underline">
+                {QUILORA_CONTACT_EMAIL}
               </a>{' '}
               and we&apos;ll verify you manually.
             </p>

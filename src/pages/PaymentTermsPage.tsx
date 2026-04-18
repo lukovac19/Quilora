@@ -7,14 +7,17 @@ import { PaymentTermsBody } from '../legal/paymentTermsBody';
 
 const TOC = [
   { id: 'section-1', label: '1. INTRODUCTION' },
-  { id: 'section-2', label: '2. PADDLE AS OUR MERCHANT OF RECORD' },
-  { id: 'section-3', label: '3. SUBSCRIPTIONS AND AUTO-RENEWAL' },
-  { id: 'section-4', label: '4. CANCELLATION POLICY' },
-  { id: 'section-5', label: '5. REFUND POLICY' },
-  { id: 'section-6', label: '6. TAXES' },
-  { id: 'section-7', label: '7. DISPUTES AND CHARGEBACKS' },
-  { id: 'section-8', label: '8. PRICE CHANGES' },
-  { id: 'section-contact', label: 'Billing support' },
+  { id: 'section-2', label: '2. MERCHANT OF RECORD' },
+  { id: 'section-3', label: '3. TIERS & PRICING' },
+  { id: 'section-4', label: '4. BILLING & RENEWAL' },
+  { id: 'section-5', label: '5. CANCELLATION' },
+  { id: 'section-6', label: '6. REFUND POLICY' },
+  { id: 'section-7', label: '7. TAXES' },
+  { id: 'section-8', label: '8. CREDIT SYSTEM' },
+  { id: 'section-9', label: '9. BILLING DISPUTES' },
+  { id: 'section-10', label: '10. CHANGES' },
+  { id: 'section-11', label: '11. COMPLIANCE' },
+  { id: 'section-12', label: '12. CONTACT' },
 ] as const;
 
 export function PaymentTermsPage() {
@@ -39,7 +42,7 @@ export function PaymentTermsPage() {
         <div className="container mx-auto max-w-6xl">
           <div className="mb-10 text-center">
             <h1 className="quilora-heading-section text-2xl font-bold text-white sm:text-3xl">Full payment terms</h1>
-            <p className="mx-auto mt-3 max-w-xl text-sm text-white/50">Last updated: April 14, 2026</p>
+            <p className="mx-auto mt-3 max-w-xl text-sm text-white/50">Last updated: April 18, 2026</p>
           </div>
 
           <div className="flex flex-col gap-10 lg:flex-row lg:items-start lg:gap-10">

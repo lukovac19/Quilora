@@ -4,8 +4,9 @@ import type { NavigateFunction } from 'react-router';
 import { Lock, Sparkles, Mail, ArrowRight, X } from 'lucide-react';
 import type { User } from '../../context/AppContext';
 import { markGenesisChoiceFlowPending } from '../../lib/genesisEarlyAccessSession';
+import { QUILORA_CONTACT_EMAIL } from '../../lib/siteContact';
 
-const SUPPORT = 'support@quilora.com';
+const SUPPORT = QUILORA_CONTACT_EMAIL;
 
 function tierPublicLabel(user: User): string {
   const t = user.profileTier ?? 'bookworm';
