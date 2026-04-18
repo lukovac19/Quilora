@@ -64,15 +64,16 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     };
   }, [earlyAccessPricing]);
 
-  const handleGetStarted = useCallback(() => {
-    navigate('/auth?mode=signup');
-  }, [navigate]);
-
   const afterNav = onCheckoutCompleted ? '/onboarding' : undefined;
 
   const runCheckoutSubscription = useCallback(async () => {
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
+      return;
+    }
+    if (!user.emailConfirmed) {
+      toast.error('Please verify your email before continuing to checkout.');
+      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/pricing'));
       return;
     }
     const yearlyKey: InternalPlanKey = 'bookworm_yearly';
@@ -97,20 +98,31 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (!res.ok && res.reason === 'not_configured') {
-      if (import.meta.env.DEV) toast.message(res.message);
+      console.warn('[checkout] not_configured', res.message);
+      toast.error(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(primary);
         return;
       }
-      handleGetStarted();
+      if (/please sign in/i.test(res.message)) {
+        navigate('/auth?mode=login&redirect=' + encodeURIComponent('/pricing'));
+      }
       return;
     }
-    if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, navigate, handleGetStarted, afterNav, onCheckoutCompleted]);
+    if (!res.ok) {
+      console.warn('[checkout]', res.reason, res.message);
+      toast.error(res.message);
+    }
+  }, [user, displayedBilling, navigate, afterNav, onCheckoutCompleted]);
 
   const runBibliophileCheckout = useCallback(async () => {
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
+      return;
+    }
+    if (!user.emailConfirmed) {
+      toast.error('Please verify your email before continuing to checkout.');
+      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/pricing'));
       return;
     }
     const yearlyKey: InternalPlanKey = 'sage_yearly';
@@ -131,16 +143,22 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       });
     }
     if (!res.ok && res.reason === 'not_configured') {
-      if (import.meta.env.DEV) toast.message(res.message);
+      console.warn('[checkout] not_configured', res.message);
+      toast.error(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(primary);
         return;
       }
-      handleGetStarted();
+      if (/please sign in/i.test(res.message)) {
+        navigate('/auth?mode=login&redirect=' + encodeURIComponent('/pricing'));
+      }
       return;
     }
-    if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, navigate, handleGetStarted, afterNav, onCheckoutCompleted]);
+    if (!res.ok) {
+      console.warn('[checkout]', res.reason, res.message);
+      toast.error(res.message);
+    }
+  }, [user, displayedBilling, navigate, afterNav, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
     if (!user?.id) {
@@ -148,7 +166,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (user && !user.emailConfirmed) {
-      toast.error('Please verify your email before checkout.');
+      toast.error('Please verify your email before continuing to checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
       return;
     }
@@ -171,16 +189,19 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       afterSuccessNavigate: afterNav,
     });
     if (!res.ok && res.reason === 'not_configured') {
-      if (import.meta.env.DEV) toast.message(res.message);
+      console.warn('[checkout] not_configured', res.message);
+      toast.error(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(product);
         return;
       }
-      toast.error('Checkout is not configured yet.');
       return;
     }
-    if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate, toast]);
+    if (!res.ok) {
+      console.warn('[checkout]', res.reason, res.message);
+      toast.error(res.message);
+    }
+  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate]);
 
   const lockEarlySage = useCallback(async () => {
     if (!user?.id) {
@@ -188,7 +209,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       return;
     }
     if (user && !user.emailConfirmed) {
-      toast.error('Please verify your email before checkout.');
+      toast.error('Please verify your email before continuing to checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
       return;
     }
@@ -211,16 +232,19 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       afterSuccessNavigate: afterNav,
     });
     if (!res.ok && res.reason === 'not_configured') {
-      if (import.meta.env.DEV) toast.message(res.message);
+      console.warn('[checkout] not_configured', res.message);
+      toast.error(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(product);
         return;
       }
-      toast.error('Checkout is not configured yet.');
       return;
     }
-    if (!res.ok) toast.error(res.message);
-  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate, toast]);
+    if (!res.ok) {
+      console.warn('[checkout]', res.reason, res.message);
+      toast.error(res.message);
+    }
+  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate]);
 
   const claimGenesisSeatEarly = useCallback(() => {
     if (!user?.id) {

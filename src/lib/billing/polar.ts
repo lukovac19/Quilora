@@ -4,12 +4,10 @@
  * TODO_POLAR_ENV — `VITE_POLAR_ENV=sandbox` | `production` (informational for client; server uses `POLAR_ENV`).
  */
 
+import { getPublicSiteOrigin } from '../publicSiteOrigin';
+
 export function quiloraPublicAppUrl(): string {
-  // TODO_APP_URL
-  const fromEnv = (import.meta.env.VITE_APP_URL as string | undefined)?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
-  if (typeof window !== 'undefined') return window.location.origin.replace(/\/$/, '');
-  return '';
+  return getPublicSiteOrigin();
 }
 
 export function polarClientEnv(): 'sandbox' | 'production' {

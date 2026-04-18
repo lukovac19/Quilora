@@ -7,21 +7,16 @@ import { Mail, Lock, X, Sparkles, LayoutGrid, BrainCircuit, Highlighter } from '
 import { ModernNavbar } from '../components/ModernNavbar';
 import { safeInternalPath } from '../lib/safeInternalPath';
 import { markGenesisChoiceFlowPending } from '../lib/genesisEarlyAccessSession';
+import { getAuthRedirectBaseUrl } from '../lib/publicSiteOrigin';
+import {
+  collectSupabaseAuthUrlParams,
+  formatSupabaseAuthUrlErrorMessage,
+  stripSupabaseOAuthErrorParamsFromUrl,
+} from '../lib/supabaseAuthUrlParams';
 
 const GENESIS_CHOICE_REDIRECT_PATH = '/early-access/genesis-choice';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
-
-function parseAuthHashParams(): Record<string, string> {
-  const raw = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
-  const out: Record<string, string> = {};
-  if (!raw) return out;
-  for (const part of raw.split('&')) {
-    const [k, v] = part.split('=');
-    if (k) out[decodeURIComponent(k)] = v ? decodeURIComponent(v.replace(/\+/g, ' ')) : '';
-  }
-  return out;
-}
 
 function isDuplicateEmailError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
@@ -210,14 +205,15 @@ export function AuthPage() {
   }, [searchParams, setSearchParams]);
 
   useEffect(() => {
-    const h = parseAuthHashParams();
-    if (h.error_code === 'otp_expired' || (h.error && /expired/i.test(h.error))) {
-      setError('That link has expired. Request a new reset or confirmation email.');
-      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    const params = collectSupabaseAuthUrlParams();
+    const msg = formatSupabaseAuthUrlErrorMessage(params);
+    if (msg) {
+      setError(msg);
+      stripSupabaseOAuthErrorParamsFromUrl();
     }
   }, []);
 
-  const authRedirectUrl = `${window.location.origin}/auth`;
+  const authRedirectUrl = getAuthRedirectBaseUrl();
 
   const mapSessionToUser = useCallback((sessionUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown>; email_confirmed_at?: string | null }): User => {
     const meta = sessionUser.user_metadata as {

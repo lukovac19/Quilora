@@ -9,17 +9,12 @@ const GENESIS_CHOICE_REDIRECT_PATH = '/early-access/genesis-choice';
 import { useApp } from '../context/AppContext';
 import { ModernNavbar } from '../components/ModernNavbar';
 import { QUILORA_CONTACT_EMAIL } from '../lib/siteContact';
-
-function parseHashParams(): Record<string, string> {
-  const raw = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '') : '';
-  const out: Record<string, string> = {};
-  if (!raw) return out;
-  for (const part of raw.split('&')) {
-    const [k, v] = part.split('=');
-    if (k) out[decodeURIComponent(k)] = v ? decodeURIComponent(v.replace(/\+/g, ' ')) : '';
-  }
-  return out;
-}
+import { getAuthRedirectBaseUrl } from '../lib/publicSiteOrigin';
+import {
+  collectSupabaseAuthUrlParams,
+  formatSupabaseAuthUrlErrorMessage,
+  stripSupabaseOAuthErrorParamsFromUrl,
+} from '../lib/supabaseAuthUrlParams';
 
 export function VerifyEmailPage() {
   const navigate = useNavigate();
@@ -61,12 +56,10 @@ export function VerifyEmailPage() {
   }, [navigate, refreshAuthUser]);
 
   useEffect(() => {
-    const hash = parseHashParams();
-    if (hash.error_code === 'otp_expired' || hash.error?.includes('expired')) {
-      setExpiredOrError('That confirmation link has expired. Request a new email below.');
-    } else if (hash.error) {
-      setExpiredOrError(hash.error_description || hash.error || 'Email confirmation failed. Try resending the link.');
-    }
+    const params = collectSupabaseAuthUrlParams();
+    const msg = formatSupabaseAuthUrlErrorMessage(params);
+    if (msg) setExpiredOrError(msg);
+    if (params.error || params.error_code) stripSupabaseOAuthErrorParamsFromUrl();
     void refreshSession();
   }, [refreshSession]);
 
@@ -75,7 +68,11 @@ export function VerifyEmailPage() {
     if (!target) return;
     setResendBusy(true);
     setResendMessage(null);
-    const { error } = await supabase.auth.resend({ type: 'signup', email: target });
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: target,
+      options: { emailRedirectTo: getAuthRedirectBaseUrl() },
+    });
     setResendBusy(false);
     if (error) {
       setResendMessage(error.message);
