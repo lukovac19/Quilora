@@ -37,8 +37,8 @@ import {
   type GhostProposal,
   type LensSubtype,
 } from '../lib/canvasNodeModel';
-import { initialLensPayload, buildActivatedLensContent, lensActivationCredit, LENS_SUBTYPE_LABELS } from '../lib/lensNodeModel';
-import { initialEvidencePayload, buildAnchorFromCorpus, EVIDENCE_ANCHOR_CREDITS } from '../lib/evidenceNodeModel';
+import { initialLensPayload, lensActivationCredit, LENS_SUBTYPE_LABELS } from '../lib/lensNodeModel';
+import { initialEvidencePayload, EVIDENCE_ANCHOR_CREDITS } from '../lib/evidenceNodeModel';
 import type { CCBookEntry } from '../lib/ccCatalog';
 import { NodeKindOverlayPanel } from '../components/canvas/NodeKindOverlayPanel';
 import { CanvasBlockChrome } from '../components/canvas/CanvasBlockChrome';
@@ -53,14 +53,23 @@ import { EvidenceBlockChrome } from '../components/canvas/EvidenceBlockChrome';
 import { ConnectorBlockChrome } from '../components/canvas/ConnectorBlockChrome';
 import { ConnectorPickerEP07 } from '../components/canvas/ConnectorPickerEP07';
 import type { ConnectorLinkType } from '../lib/connectorNodeModel';
-import {
-  CONNECTOR_AI_CREDITS,
-  buildConnectorAiPrompt,
-  initialConnectorPayload,
-  CONNECTOR_LINK_LABELS,
-} from '../lib/connectorNodeModel';
+import { CONNECTOR_AI_CREDITS, initialConnectorPayload, CONNECTOR_LINK_LABELS } from '../lib/connectorNodeModel';
 import { buildFreestylePromptContext, initialFreestylePayload, FREESTYLE_PROMPT_CREDITS } from '../lib/freestyleNodeModel';
 import { FreestyleBlockChrome, FREESTYLE_BUBBLE_DRAG_MIME } from '../components/canvas/FreestyleBlockChrome';
+import { registerSourceCorpus } from '../lib/documents/corpusRegistry';
+import { collectConnectorDocumentIds, getDocumentIdForSourceNode, getPageTextForLinkedSource } from '../lib/canvas/corpusFromNodes';
+import {
+  bundleFromAnswer,
+  ensureDocumentIngested,
+  runConnectorGroundedPipeline,
+  runEvidenceAnchorPipeline,
+  runFreestyleGrounded,
+  runLensGroundedPipeline,
+} from '../lib/canvas/groundedNodeRuntime';
+import { retrieveGroundedContext } from '../lib/ai/pipeline/retrievePipeline';
+import { runGroundedReadingQa } from '../lib/ai/pipeline/answerPipeline';
+import type { GroundedCitation } from '../lib/ai/types/groundedAnswer';
+import type { AiEvidenceBundle } from '../lib/ai/types/aiEvidenceBundle';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
 
@@ -1135,23 +1144,34 @@ export function SandboxExperience() {
         sourceSystemId: newSourceSystemId(),
       };
       const displayTitle = (extractedTitle || file.name.replace(/\.(pdf|epub)$/i, '') || 'Source').slice(0, 200);
-      setNodes((prev) => [
-        ...prev,
-        createCanvasNode({
-          kind: 'source',
-          label: file.name.slice(0, 120),
-          x: cx,
-          y: cy,
-          width: 300,
-          height: 220,
-          title: displayTitle,
-          tileVariant: 'upload',
-          sourceArtifact: artifact,
-        }),
-      ]);
+      const newSourceNode = createCanvasNode({
+        kind: 'source',
+        label: file.name.slice(0, 120),
+        x: cx,
+        y: cy,
+        width: 300,
+        height: 220,
+        title: displayTitle,
+        tileVariant: 'upload',
+        sourceArtifact: artifact,
+      });
+      registerSourceCorpus({
+        documentId: artifact.sourceSystemId,
+        sourceTitle: displayTitle,
+        pages: map,
+        canvasSourceNodeId: newSourceNode.id,
+      });
+      const sk = activeSandboxId || sessionId || 'local';
+      void ensureDocumentIngested({
+        sandboxKey: sk,
+        documentId: artifact.sourceSystemId,
+        sourceTitle: displayTitle,
+        pages: map,
+      });
+      setNodes((prev) => [...prev, newSourceNode]);
       showToast('Source block added from file', 'success');
     },
-    [canvasPan.x, canvasPan.y, canvasScale, showToast],
+    [activeSandboxId, sessionId, canvasPan.x, canvasPan.y, canvasScale, showToast],
   );
 
   const handleCcLibraryActivate = useCallback(
@@ -1180,25 +1200,36 @@ export function SandboxExperience() {
         linkedFileName: book.title,
         sourceSystemId: newSourceSystemId(),
       };
-      setNodes((prev) => [
-        ...prev,
-        createCanvasNode({
-          kind: 'source',
-          label: book.title.slice(0, 120),
-          x: cx,
-          y: cy,
-          width: 300,
-          height: 220,
-          title: book.title,
-          body: `${book.title} — ${book.author} (CC catalog, MVP placeholder).`,
-          tileVariant: 'cc_library',
-          sourceArtifact: artifact,
-        }),
-      ]);
+      const bodyText = `${book.title} — ${book.author} (CC catalog, MVP placeholder).`;
+      const ccNode = createCanvasNode({
+        kind: 'source',
+        label: book.title.slice(0, 120),
+        x: cx,
+        y: cy,
+        width: 300,
+        height: 220,
+        title: book.title,
+        body: bodyText,
+        tileVariant: 'cc_library',
+        sourceArtifact: artifact,
+      });
+      registerSourceCorpus({
+        documentId: artifact.sourceSystemId,
+        sourceTitle: book.title,
+        pages: { 1: bodyText },
+        canvasSourceNodeId: ccNode.id,
+      });
+      void ensureDocumentIngested({
+        sandboxKey: activeSandboxId || sessionId || 'local',
+        documentId: artifact.sourceSystemId,
+        sourceTitle: book.title,
+        pages: { 1: bodyText },
+      });
+      setNodes((prev) => [...prev, ccNode]);
       setCcLibraryOpen(false);
       showToast('Source added from CC Library (5 cr).', 'success');
     },
-    [activeSandboxId, canvasPan.x, canvasPan.y, canvasReadOnly, canvasScale, showToast],
+    [activeSandboxId, sessionId, canvasPan.x, canvasPan.y, canvasReadOnly, canvasScale, showToast],
   );
 
   const handleFragmentClipSubmit = useCallback(
@@ -1214,25 +1245,35 @@ export function SandboxExperience() {
         linkedFileName: null,
         sourceSystemId: newSourceSystemId(),
       };
-      setNodes((prev) => [
-        ...prev,
-        createCanvasNode({
-          kind: 'source',
-          label: title.slice(0, 120),
-          x: cx,
-          y: cy,
-          title,
-          body,
-          tileVariant: 'fragment',
-          sourceArtifact: artifact,
-          width: 280,
-          height: 200,
-        }),
-      ]);
+      const fragNode = createCanvasNode({
+        kind: 'source',
+        label: title.slice(0, 120),
+        x: cx,
+        y: cy,
+        title,
+        body,
+        tileVariant: 'fragment',
+        sourceArtifact: artifact,
+        width: 280,
+        height: 200,
+      });
+      registerSourceCorpus({
+        documentId: artifact.sourceSystemId,
+        sourceTitle: title,
+        pages: { 1: body },
+        canvasSourceNodeId: fragNode.id,
+      });
+      void ensureDocumentIngested({
+        sandboxKey: activeSandboxId || sessionId || 'local',
+        documentId: artifact.sourceSystemId,
+        sourceTitle: title,
+        pages: { 1: body },
+      });
+      setNodes((prev) => [...prev, fragNode]);
       setFragmentModalOpen(false);
       showToast('Fragment Source added.', 'success');
     },
-    [canvasPan.x, canvasPan.y, canvasScale, showToast],
+    [activeSandboxId, sessionId, canvasPan.x, canvasPan.y, canvasScale, showToast],
   );
 
   const handleChapterOverlayConfirm = useCallback(
@@ -1338,28 +1379,79 @@ export function SandboxExperience() {
         showToast(res.message || 'Insufficient credits for lens.', 'warning');
         return;
       }
-      await new Promise((r) => setTimeout(r, 500));
-      const excerpt = buildDocumentContextExcerpt(pageTextByPage, LENS_CONTEXT_MAX_CHARS);
-      const built = buildActivatedLensContent(lp.subtype, { sourceTitle, documentExcerpt: excerpt });
-      patchNode(lensNode.id, {
-        lensPayload: { ...lp, ...built },
-        body: built.outputBody.slice(0, 480),
+      const src = nodesRef.current.find((s) => s.id === lp.linkedSourceNodeId);
+      const docId = getDocumentIdForSourceNode(src ?? null);
+      const pages = docId ? getPageTextForLinkedSource(lp.linkedSourceNodeId!, nodesRef.current, pageTextByPage) : {};
+      const sk = activeSandboxId || sessionId || 'local';
+      if (!docId || !Object.keys(pages).length) {
+        patchNode(lensNode.id, {
+          lensPayload: {
+            ...lp,
+            loading: false,
+            outputBody: 'No Source text is available yet. Upload a PDF or wait for extraction, then retry.',
+            citationFooter: sourceTitle,
+            aiEvidence: bundleFromAnswer(
+              {
+                answer: 'Insufficient evidence — no indexed pages for this Source.',
+                grounded: false,
+                confidence: 0,
+                citations: [],
+                insufficient_evidence: true,
+                reason: 'no_pages',
+              },
+              'strict',
+            ),
+          },
+          body: 'No Source text available.',
+        });
+        showToast('Lens could not run — no Source text.', 'warning');
+        return;
+      }
+      const rag = await runLensGroundedPipeline({
+        sandboxKey: sk,
+        documentId: docId,
+        sourceTitle,
+        pages,
+        subtype: lp.subtype,
       });
-      showToast(`Lens activated — ${cost} credits deducted.`, 'success');
+      const aiEvidence = bundleFromAnswer(rag.answer, 'strict');
+      const cite0 = rag.answer.citations[0];
+      const footer = cite0 ? `${cite0.source_title} · p.${cite0.page_number} · ${cite0.chunk_id}` : sourceTitle;
+      patchNode(lensNode.id, {
+        lensPayload: {
+          ...lp,
+          loading: false,
+          lastCreditDebit: cost,
+          outputBody: rag.answer.answer,
+          citationFooter: footer,
+          aiEvidence,
+          personaTraits: rag.personaTraits ?? lp.personaTraits,
+          plotEvents: rag.plotEvents ?? lp.plotEvents,
+          symbolismBody: lp.subtype === 'symbol' ? rag.answer.answer : lp.symbolismBody,
+          motifBody: lp.subtype === 'symbol' ? rag.answer.answer : lp.motifBody,
+          symbolSourceCitation: lp.subtype === 'symbol' ? footer : lp.symbolSourceCitation,
+        },
+        body: rag.answer.answer.slice(0, 480),
+      });
+      if (rag.ingestError) {
+        showToast(`Lens saved but embeddings warning: ${rag.ingestError.slice(0, 120)}`, 'warning');
+      } else {
+        showToast(`Lens activated — ${cost} credits deducted.`, 'success');
+      }
     },
-    [activeSandboxId, canvasReadOnly, pageTextByPage, patchNode, showToast],
+    [activeSandboxId, sessionId, canvasReadOnly, pageTextByPage, patchNode, showToast],
   );
 
   const handlePersonaLensSubmit = useCallback(
     async (nodeId: string, characterName: string) => {
-      const n = nodes.find((x) => x.id === nodeId);
+      const n = nodesRef.current.find((x) => x.id === nodeId);
       if (!n?.lensPayload || n.lensPayload.subtype !== 'persona') return;
       if (canvasReadOnly) {
         showToast('Read-only sandbox.', 'warning');
         return;
       }
       const lp = n.lensPayload;
-      const src = nodes.find((s) => s.id === lp.linkedSourceNodeId);
+      const src = nodesRef.current.find((s) => s.id === lp.linkedSourceNodeId);
       const sourceTitle = src?.title || src?.label || 'Source';
       patchNode(nodeId, { lensPayload: { ...lp, loading: true } });
       const cost = lensActivationCredit('persona');
@@ -1375,16 +1467,60 @@ export function SandboxExperience() {
         showToast(res.message || 'Insufficient credits for lens.', 'warning');
         return;
       }
-      await new Promise((r) => setTimeout(r, 450));
-      const excerpt = buildDocumentContextExcerpt(pageTextByPage, LENS_CONTEXT_MAX_CHARS);
-      const built = buildActivatedLensContent('persona', { sourceTitle, documentExcerpt: excerpt, characterName });
+      const docId = getDocumentIdForSourceNode(src ?? null);
+      const pages = docId ? getPageTextForLinkedSource(lp.linkedSourceNodeId!, nodesRef.current, pageTextByPage) : {};
+      const sk = activeSandboxId || sessionId || 'local';
+      if (!docId || !Object.keys(pages).length) {
+        patchNode(nodeId, {
+          lensPayload: {
+            ...lp,
+            loading: false,
+            personaCharacterName: characterName,
+            outputBody: 'No Source text is available yet for persona analysis.',
+            citationFooter: sourceTitle,
+            aiEvidence: bundleFromAnswer(
+              {
+                answer: 'Insufficient evidence — no indexed pages for this Source.',
+                grounded: false,
+                confidence: 0,
+                citations: [],
+                insufficient_evidence: true,
+                reason: 'no_pages',
+              },
+              'strict',
+            ),
+          },
+        });
+        showToast('Persona lens needs Source text.', 'warning');
+        return;
+      }
+      const rag = await runLensGroundedPipeline({
+        sandboxKey: sk,
+        documentId: docId,
+        sourceTitle,
+        pages,
+        subtype: 'persona',
+        characterName,
+      });
+      const aiEvidence = bundleFromAnswer(rag.answer, 'strict');
+      const cite0 = rag.answer.citations[0];
+      const footer = cite0 ? `${cite0.source_title} · p.${cite0.page_number}` : sourceTitle;
       patchNode(nodeId, {
-        lensPayload: { ...lp, ...built },
-        body: built.outputBody.slice(0, 480),
+        lensPayload: {
+          ...lp,
+          loading: false,
+          lastCreditDebit: cost,
+          personaCharacterName: characterName,
+          outputBody: rag.answer.answer,
+          citationFooter: `${characterName} · ${footer}`,
+          personaTraits: rag.personaTraits ?? [],
+          aiEvidence,
+        },
+        body: rag.answer.answer.slice(0, 480),
       });
       showToast(`Lens activated — ${cost} credits deducted.`, 'success');
     },
-    [activeSandboxId, canvasReadOnly, nodes, pageTextByPage, patchNode, showToast],
+    [activeSandboxId, sessionId, canvasReadOnly, pageTextByPage, patchNode, showToast],
   );
 
   const runEvidenceActivation = useCallback(
@@ -1408,19 +1544,60 @@ export function SandboxExperience() {
         showToast(res.message || 'Insufficient credits for evidence anchor.', 'warning');
         return;
       }
-      const anchor = buildAnchorFromCorpus(sourceTitle, pageTextByPage);
+      const src = nodesRef.current.find((s) => s.id === ep.linkedSourceNodeId);
+      const docId = getDocumentIdForSourceNode(src ?? null);
+      const pages = docId ? getPageTextForLinkedSource(ep.linkedSourceNodeId, nodesRef.current, pageTextByPage) : {};
+      const sk = activeSandboxId || sessionId || 'local';
+      if (!docId || !Object.keys(pages).length) {
+        patchNode(evidenceNode.id, {
+          evidencePayload: {
+            ...ep,
+            loading: false,
+            verbatimQuote: 'No Source text is indexed yet.',
+            chapterSectionCitation: sourceTitle,
+            attachedBlockLabel: 'Not anchored',
+            trustFactorLabel: 'Low',
+            anchorCreditsDebited: cost,
+            anchorAiEvidence: bundleFromAnswer(
+              {
+                answer: 'Insufficient evidence — no pages for this Source.',
+                grounded: false,
+                confidence: 0,
+                citations: [],
+                insufficient_evidence: true,
+                reason: 'no_pages',
+              },
+              'strict',
+            ),
+          },
+        });
+        showToast('Evidence anchor needs Source text.', 'warning');
+        return;
+      }
+      const rag = await runEvidenceAnchorPipeline({
+        sandboxKey: sk,
+        documentId: docId,
+        sourceTitle,
+        pages,
+      });
+      const aiEvidence = bundleFromAnswer(rag.answer, 'strict');
+      const c0 = rag.answer.citations[0];
       patchNode(evidenceNode.id, {
         evidencePayload: {
           ...ep,
           loading: false,
-          ...anchor,
+          verbatimQuote: c0?.quoted_text || rag.answer.answer,
+          chapterSectionCitation: c0 ? `p.${c0.page_number} · ${c0.chunk_id}` : sourceTitle,
+          attachedBlockLabel: `Anchored · ${sourceTitle}`,
+          trustFactorLabel: rag.answer.grounded ? 'High' : 'Low',
           anchorCreditsDebited: cost,
+          anchorAiEvidence: aiEvidence,
         },
-        body: anchor.verbatimQuote.slice(0, 400),
+        body: (c0?.quoted_text || rag.answer.answer).slice(0, 400),
       });
       showToast(`Evidence anchor — ${cost} credits deducted.`, 'success');
     },
-    [activeSandboxId, canvasReadOnly, pageTextByPage, patchNode, showToast],
+    [activeSandboxId, sessionId, canvasReadOnly, pageTextByPage, patchNode, showToast],
   );
 
   const evidenceMicroSearchPaid = useCallback(
@@ -1709,6 +1886,16 @@ export function SandboxExperience() {
     [nodes, canvasScale],
   );
 
+  const handleAiCitationOpen = useCallback(
+    (c: GroundedCitation) => {
+      const match = nodes.find((n) => n.kind === 'source' && n.sourceArtifact?.sourceSystemId === c.document_id);
+      if (match) focusNodeOnCanvas(match.id);
+      setActiveReadingPage(Math.max(1, c.page_number || 1));
+      setWorkspaceMode('reading');
+    },
+    [nodes, focusNodeOnCanvas],
+  );
+
   const isBookwormTier = user?.profileTier === 'bookworm' || user?.profileTier === undefined;
 
   const toggleNodeSelected = useCallback((id: string) => {
@@ -1794,6 +1981,35 @@ export function SandboxExperience() {
     setPageTextByPage({});
     setPdfDocumentTitle(null);
   }, [selectedFile]);
+
+  /** Keep the default Source’s in-memory index aligned with Reading Mode page text. */
+  useEffect(() => {
+    if (phase !== 'workspace') return;
+    const chars = Object.values(pageTextByPage).join('').trim().length;
+    if (chars < 40) return;
+    const sk = activeSandboxId || sessionId || 'local';
+    const src =
+      nodes.find(
+        (n) =>
+          n.kind === 'source' &&
+          n.sourceArtifact &&
+          Boolean(selectedFile?.name) &&
+          n.sourceArtifact.linkedFileName === selectedFile?.name,
+      ) ?? nodes.find((n) => n.kind === 'source' && n.sourceArtifact);
+    if (!src?.sourceArtifact) return;
+    registerSourceCorpus({
+      documentId: src.sourceArtifact.sourceSystemId,
+      sourceTitle: src.title || src.label,
+      pages: pageTextByPage,
+      canvasSourceNodeId: src.id,
+    });
+    void ensureDocumentIngested({
+      sandboxKey: sk,
+      documentId: src.sourceArtifact.sourceSystemId,
+      sourceTitle: src.title || src.label,
+      pages: pageTextByPage,
+    });
+  }, [phase, nodes, pageTextByPage, activeSandboxId, sessionId, selectedFile?.name]);
 
   useEffect(() => {
     if (phase !== 'workspace' || !selectedFile) return;
@@ -2875,7 +3091,7 @@ export function SandboxExperience() {
         }
 
         const docName = selectedFile?.name ?? activeSandboxName;
-        const citation = `${docName} · grounded in sandbox Reading / PDF extraction`;
+        let citation = `${docName} · grounded in sandbox Reading / PDF extraction`;
         const midX = (a.x + a.width / 2 + b.x + b.width / 2) / 2 - 130;
         const midY = (a.y + a.height / 2 + b.y + b.height / 2) / 2 - 90;
 
@@ -2900,34 +3116,29 @@ export function SandboxExperience() {
           { id: `conn-${cid}-${toId}`, from: cid, to: toId, linkType },
         ]);
 
-        const excerpt = buildDocumentContextExcerpt(pageTextByPage, CHAT_CONTEXT_MAX_CHARS);
-        const prompt = buildConnectorAiPrompt({
-          linkType,
-          fromTitle: a.title || a.label,
-          fromBody: a.body,
-          toTitle: b.title || b.label,
-          toBody: b.body,
-          documentExcerpt: excerpt,
-          userReasoning: linkType === 'cause_effect' ? userReasoning : undefined,
-        });
-
+        const sk = activeSandboxId || sessionId || 'local';
+        const docIds = collectConnectorDocumentIds(list);
         let analysis = '';
+        let aiEvidence = null as ReturnType<typeof bundleFromAnswer> | null;
         try {
-          const direct = await tryQuiloraDeepseek(prompt);
-          if (direct) {
-            analysis = direct;
-          } else {
-            const activeSessionId = await ensureSessionId();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (activeSessionId && session?.access_token) {
-              const json = await postSandboxChat(session.access_token, activeSessionId, prompt);
-              analysis = (json?.message?.content ?? '').trim();
-            }
+          const grounded = await runConnectorGroundedPipeline({
+            sandboxKey: sk,
+            documentIds: docIds,
+            linkLabel: CONNECTOR_LINK_LABELS[linkType],
+            blockA: `${a.title || a.label}\n${a.body}`,
+            blockB: `${b.title || b.label}\n${b.body}`,
+            userHypothesis: linkType === 'cause_effect' ? userReasoning : undefined,
+          });
+          analysis = grounded.answer;
+          aiEvidence = bundleFromAnswer(grounded, 'strict');
+          const c0 = grounded.citations[0];
+          if (c0) {
+            citation = `${c0.source_title} · p.${c0.page_number} · ${c0.chunk_id.slice(0, 24)}…`;
           }
         } catch {
-          analysis = 'Analysis could not be completed. Check your connection and try again.';
+          analysis = 'Connector analysis could not be completed. Check API keys and try again.';
         }
-        if (!analysis) analysis = 'No analysis returned.';
+        if (!analysis.trim()) analysis = 'No analysis returned.';
 
         patchNode(cid, {
           connectorPayload: {
@@ -2937,6 +3148,7 @@ export function SandboxExperience() {
             sourceCitation: citation,
             aiLoading: false,
             creditsDebited: CONNECTOR_AI_CREDITS,
+            aiEvidence,
           },
           body: analysis.slice(0, 400),
         });
@@ -2945,16 +3157,7 @@ export function SandboxExperience() {
         setCauseAiBusy(false);
       }
     },
-    [
-      activeSandboxId,
-      activeSandboxName,
-      canvasReadOnly,
-      ensureSessionId,
-      pageTextByPage,
-      patchNode,
-      selectedFile?.name,
-      showToast,
-    ],
+    [activeSandboxId, activeSandboxName, canvasReadOnly, sessionId, patchNode, showToast],
   );
 
   const onMultiConnect = useCallback(() => {
@@ -2982,7 +3185,7 @@ export function SandboxExperience() {
     }
   }, []);
 
-  const streamFreestyleAssistant = useCallback(async (nodeId: string, assistantId: string, text: string) => {
+  const streamFreestyleAssistant = useCallback(async (nodeId: string, assistantId: string, text: string, aiEvidence?: AiEvidenceBundle | null) => {
     const chunks = text.split(/(\s+)/).filter(Boolean);
     let acc = '';
     for (const chunk of chunks) {
@@ -2995,6 +3198,17 @@ export function SandboxExperience() {
             m.id === assistantId && m.role === 'assistant' ? { ...m, content: acc, pending: false } : m,
           );
           return { ...n, body: acc.slice(0, 400), freestylePayload: { ...n.freestylePayload, messages } };
+        }),
+      );
+    }
+    if (aiEvidence !== undefined) {
+      setNodes((prev) =>
+        prev.map((n) => {
+          if (n.id !== nodeId || !n.freestylePayload) return n;
+          const messages = n.freestylePayload.messages.map((m) =>
+            m.id === assistantId && m.role === 'assistant' ? { ...m, aiEvidence: aiEvidence ?? undefined } : m,
+          );
+          return { ...n, freestylePayload: { ...n.freestylePayload, messages } };
         }),
       );
     }
@@ -3036,7 +3250,7 @@ export function SandboxExperience() {
           mode: fp.mode,
           linkedSourceNodeId: fp.linkedSourceNodeId,
           sourceDocumentLabel: fp.sourceDocumentLabel,
-          messages: [{ id: assistantId, role: 'assistant', content: text, pending: false }],
+          messages: [{ id: assistantId, role: 'assistant', content: text, pending: false, aiEvidence: msg.aiEvidence }],
         },
       });
       setNodes((prev) => [...prev, newNode]);
@@ -3082,26 +3296,23 @@ export function SandboxExperience() {
         }
 
         const promptBody = buildFreestylePromptContext(nextMessages);
-        const excerpt =
-          fp.mode === 'connected' ? buildDocumentContextExcerpt(pageTextByPage, CHAT_CONTEXT_MAX_CHARS) : '';
-        const payloadMessage = excerpt
-          ? `The following is extracted text from the user's document (grounding — treat as source of truth where applicable):\n${excerpt}\n\nConversation:\n${promptBody}\n\nReply as Assistant to the last User line. Plain text.`
-          : `[Standalone freestyle — not document-grounded.]\n\n${promptBody}\n\nReply as Assistant to the last User line. Plain text.`;
-
-        let reply = '';
-        const direct = await tryQuiloraDeepseek(payloadMessage);
-        if (direct) {
-          reply = direct;
-        } else {
-          const activeSessionId = await ensureSessionId();
-          const { data: { session } } = await supabase.auth.getSession();
-          if (activeSessionId && session?.access_token) {
-            const json = await postSandboxChat(session.access_token, activeSessionId, payloadMessage);
-            reply = (json?.message?.content ?? '').trim();
-          }
-        }
-        if (!reply) reply = 'No response returned.';
-        await streamFreestyleAssistant(nodeId, aid, reply);
+        const sk = activeSandboxId || sessionId || 'local';
+        const srcNode = fp.linkedSourceNodeId ? nodesRef.current.find((x) => x.id === fp.linkedSourceNodeId) : null;
+        const docId = getDocumentIdForSourceNode(srcNode ?? null);
+        const pages =
+          fp.mode === 'connected' && fp.linkedSourceNodeId
+            ? getPageTextForLinkedSource(fp.linkedSourceNodeId, nodesRef.current, pageTextByPage)
+            : pageTextByPage;
+        const grounded = await runFreestyleGrounded({
+          mode: fp.mode,
+          sandboxKey: sk,
+          documentId: docId,
+          pages,
+          thread: promptBody,
+        });
+        const reply = grounded.answer.trim() || 'No response returned.';
+        const evBundle = bundleFromAnswer(grounded, fp.mode === 'connected' ? 'freestyle_connected' : 'freestyle_standalone');
+        await streamFreestyleAssistant(nodeId, aid, reply, evBundle);
         showToast(`Freestyle — ${FREESTYLE_PROMPT_CREDITS} credit deducted.`, 'success');
       } catch {
         setNodes((prev) =>
@@ -3120,7 +3331,7 @@ export function SandboxExperience() {
         setFreestyleSendingId(null);
       }
     },
-    [activeSandboxId, canvasReadOnly, ensureSessionId, pageTextByPage, showToast, streamFreestyleAssistant],
+    [activeSandboxId, sessionId, canvasReadOnly, pageTextByPage, showToast, streamFreestyleAssistant],
   );
 
   const sendChatMessage = useCallback(async (rawMessage?: string) => {
@@ -3136,13 +3347,6 @@ export function SandboxExperience() {
     setIsSendingChat(true);
     setChatMessages((prev) => [...prev, userMessage, { id: assistantMessageId, role: 'assistant', content: '', timestamp: getNowTime(), pending: true }]);
     try {
-      const excerpt = buildDocumentContextExcerpt(pageTextByPage, CHAT_CONTEXT_MAX_CHARS);
-      const payloadMessage = excerpt ? `The following is extracted text from the user's PDF (may be truncated):\n${excerpt}\n\nUser message:\n${message}` : message;
-      const direct = await tryQuiloraDeepseek(payloadMessage);
-      if (direct) {
-        await streamAssistantMessage(assistantMessageId, direct);
-        return;
-      }
       const activeSessionId = await ensureSessionId();
       const { data: { session } } = await supabase.auth.getSession();
       if (!activeSessionId || !session?.access_token) {
@@ -3160,6 +3364,43 @@ export function SandboxExperience() {
         await streamAssistantMessage(assistantMessageId, creditRes.message ?? 'Insufficient credits. Please purchase a Boost Pack to continue.');
         return;
       }
+      const sk = activeSandboxId || sessionId || 'local';
+      const src = nodesRef.current.find((n) => n.kind === 'source' && n.sourceArtifact);
+      const docId = getDocumentIdForSourceNode(src ?? null);
+      const pages = src ? getPageTextForLinkedSource(src.id, nodesRef.current, pageTextByPage) : pageTextByPage;
+      let usedRag = false;
+      try {
+        if (docId && Object.keys(pages).length) {
+          await ensureDocumentIngested({
+            sandboxKey: sk,
+            documentId: docId,
+            sourceTitle: src?.title || src?.label || 'Source',
+            pages,
+          });
+          const chunks = await retrieveGroundedContext({ sandboxKey: sk, documentIds: [docId], query: message });
+          if (chunks.length) {
+            const ans = await runGroundedReadingQa({ question: message, chunks });
+            let out = ans.answer;
+            if (ans.citations[0]) {
+              const q = ans.citations[0].quoted_text;
+              out += `\n\n— ${ans.citations[0].source_title} · p.${ans.citations[0].page_number} · “${q.slice(0, 180)}${q.length > 180 ? '…' : ''}”`;
+            }
+            await streamAssistantMessage(assistantMessageId, out);
+            usedRag = true;
+          }
+        }
+      } catch {
+        /* fall through to legacy path */
+      }
+      if (usedRag) return;
+
+      const excerpt = buildDocumentContextExcerpt(pageTextByPage, CHAT_CONTEXT_MAX_CHARS);
+      const payloadMessage = excerpt ? `The following is extracted text from the user's PDF (may be truncated):\n${excerpt}\n\nUser message:\n${message}` : message;
+      const direct = await tryQuiloraDeepseek(payloadMessage);
+      if (direct) {
+        await streamAssistantMessage(assistantMessageId, direct);
+        return;
+      }
       const json = await postSandboxChat(session.access_token, activeSessionId, payloadMessage);
       await streamAssistantMessage(assistantMessageId, json?.message?.content ?? 'The assistant could not generate a response right now. Please try again.');
     } catch {
@@ -3167,7 +3408,7 @@ export function SandboxExperience() {
     } finally {
       setIsSendingChat(false);
     }
-  }, [canvasReadOnly, chatInput, ensureSessionId, isSendingChat, pageTextByPage, showToast, streamAssistantMessage]);
+  }, [activeSandboxId, canvasReadOnly, chatInput, ensureSessionId, isSendingChat, pageTextByPage, sessionId, showToast, streamAssistantMessage]);
 
   const sendReadingChatMessage = useCallback(async (messageText?: string) => {
     const message = (messageText ?? readingChatInput).trim();
@@ -3182,15 +3423,6 @@ export function SandboxExperience() {
     setReadingIsSending(true);
     setReadingChatMessages((prev) => [...prev, userMessage, { id: assistantMessageId, role: 'assistant', content: '', timestamp: getNowTime(), pending: true }]);
     try {
-      const excerpt = buildDocumentContextExcerpt(pageTextByPage, CHAT_CONTEXT_MAX_CHARS);
-      const payloadMessage = excerpt
-        ? `The following is extracted text from the user's PDF (may be truncated):\n${excerpt}\n\nUser message:\n${message}`
-        : message;
-      const direct = await tryQuiloraDeepseek(payloadMessage);
-      if (direct) {
-        await streamReadingAssistantMessage(assistantMessageId, direct);
-        return;
-      }
       const activeSessionId = await ensureSessionId();
       const { data: { session } } = await supabase.auth.getSession();
       if (!activeSessionId || !session?.access_token) {
@@ -3208,6 +3440,45 @@ export function SandboxExperience() {
         await streamReadingAssistantMessage(assistantMessageId, creditRes.message ?? 'Insufficient credits. Please purchase a Boost Pack to continue.');
         return;
       }
+      const sk = activeSandboxId || sessionId || 'local';
+      const src = nodesRef.current.find((n) => n.kind === 'source' && n.sourceArtifact);
+      const docId = getDocumentIdForSourceNode(src ?? null);
+      const pages = src ? getPageTextForLinkedSource(src.id, nodesRef.current, pageTextByPage) : pageTextByPage;
+      let usedRag = false;
+      try {
+        if (docId && Object.keys(pages).length) {
+          await ensureDocumentIngested({
+            sandboxKey: sk,
+            documentId: docId,
+            sourceTitle: src?.title || src?.label || 'Source',
+            pages,
+          });
+          const chunks = await retrieveGroundedContext({ sandboxKey: sk, documentIds: [docId], query: message });
+          if (chunks.length) {
+            const ans = await runGroundedReadingQa({ question: message, chunks });
+            let out = ans.answer;
+            if (ans.citations[0]) {
+              const q = ans.citations[0].quoted_text;
+              out += `\n\n— ${ans.citations[0].source_title} · p.${ans.citations[0].page_number} · “${q.slice(0, 180)}${q.length > 180 ? '…' : ''}”`;
+            }
+            await streamReadingAssistantMessage(assistantMessageId, out);
+            usedRag = true;
+          }
+        }
+      } catch {
+        /* fall through */
+      }
+      if (usedRag) return;
+
+      const excerpt = buildDocumentContextExcerpt(pageTextByPage, CHAT_CONTEXT_MAX_CHARS);
+      const payloadMessage = excerpt
+        ? `The following is extracted text from the user's PDF (may be truncated):\n${excerpt}\n\nUser message:\n${message}`
+        : message;
+      const direct = await tryQuiloraDeepseek(payloadMessage);
+      if (direct) {
+        await streamReadingAssistantMessage(assistantMessageId, direct);
+        return;
+      }
       const json = await postSandboxChat(session.access_token, activeSessionId, payloadMessage);
       await streamReadingAssistantMessage(assistantMessageId, json?.message?.content ?? 'The assistant could not generate a response right now. Please try again.');
     } catch {
@@ -3215,7 +3486,7 @@ export function SandboxExperience() {
     } finally {
       setReadingIsSending(false);
     }
-  }, [canvasReadOnly, ensureSessionId, pageTextByPage, readingChatInput, readingIsSending, showToast, streamReadingAssistantMessage]);
+  }, [activeSandboxId, canvasReadOnly, ensureSessionId, pageTextByPage, readingChatInput, readingIsSending, sessionId, showToast, streamReadingAssistantMessage]);
 
   const sendReaderQuickAction = useCallback((prompt: string) => {
     void sendReadingChatMessage(prompt);
@@ -3834,6 +4105,7 @@ Difficulty: ${difficulty}.`;
                         onDuplicate={duplicateNode}
                         onResizePointerDown={onResizePointerDown}
                         onConnectorDragStart={onConnectorDragStart}
+                        onCitationOpen={handleAiCitationOpen}
                       />
                     ) : node.kind === 'freestyle' && node.freestylePayload ? (
                       <FreestyleBlockChrome
@@ -3850,6 +4122,7 @@ Difficulty: ${difficulty}.`;
                         onSendPrompt={(id, t) => void sendFreestylePrompt(id, t)}
                         onToggleUserTurnIncluded={toggleFreestyleUserTurnIncluded}
                         onSendAssistantToCanvas={sendFreestyleAssistantToCanvas}
+                        onCitationOpen={handleAiCitationOpen}
                       />
                     ) : node.kind === 'evidence' && node.evidencePayload ? (
                       <EvidenceBlockChrome
@@ -3861,7 +4134,7 @@ Difficulty: ${difficulty}.`;
                             (n) => n.id === node.evidencePayload!.linkedSourceNodeId && n.kind === 'source' && n.sourceArtifact,
                           )
                         }
-                        corpusTextByPage={pageTextByPage}
+                        corpusTextByPage={getPageTextForLinkedSource(node.evidencePayload.linkedSourceNodeId, nodes, pageTextByPage)}
                         onUpdate={patchNode}
                         onDelete={deleteNode}
                         onDuplicate={duplicateNode}
@@ -3871,6 +4144,7 @@ Difficulty: ${difficulty}.`;
                         onToggleFavorite={toggleBlockFavorite}
                         onFocusSourceNode={focusNodeOnCanvas}
                         onMicroSearchPaid={async (nodeId, _query) => evidenceMicroSearchPaid(nodeId)}
+                        onCitationOpen={handleAiCitationOpen}
                       />
                     ) : node.kind === 'lens' && node.lensPayload ? (
                       <LensBlockChrome
@@ -3885,6 +4159,7 @@ Difficulty: ${difficulty}.`;
                         onResizePointerDown={onResizePointerDown}
                         onToggleFavorite={toggleBlockFavorite}
                         onPersonaSubmit={(id, name) => void handlePersonaLensSubmit(id, name)}
+                        onCitationOpen={handleAiCitationOpen}
                       />
                     ) : (
                       <CanvasBlockChrome

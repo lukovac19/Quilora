@@ -4,6 +4,9 @@ import type { CanvasNode } from '../../lib/canvasNodeModel';
 import { NODE_LABELS } from '../../lib/canvasNodeModel';
 import type { LensNodePayload, PersonaTraitChip } from '../../lib/lensNodeModel';
 import { LENS_SUBTYPE_LABELS } from '../../lib/lensNodeModel';
+import type { GroundedCitation } from '../../lib/ai/types/groundedAnswer';
+import { CitationList } from '../citations/CitationList';
+import { TrustBadge } from '../citations/TrustBadge';
 
 /** EP-05 — Lens Block (canvas): type label, loading skeleton, output, citation footer; subtype panels. */
 export function LensBlockChrome({
@@ -18,6 +21,7 @@ export function LensBlockChrome({
   onResizePointerDown,
   onToggleFavorite,
   onPersonaSubmit,
+  onCitationOpen,
 }: {
   node: CanvasNode;
   payload: LensNodePayload;
@@ -30,6 +34,7 @@ export function LensBlockChrome({
   onResizePointerDown: (event: React.MouseEvent, nodeId: string) => void;
   onToggleFavorite: (id: string, next: boolean) => void;
   onPersonaSubmit: (nodeId: string, characterName: string) => void;
+  onCitationOpen?: (c: GroundedCitation) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showConnectHandle, setShowConnectHandle] = useState(false);
@@ -322,6 +327,15 @@ export function LensBlockChrome({
 
       {!payload.loading ? (
         <footer data-source-citation-footer className="border-t border-[#0f172a]/10 px-3 py-2 text-[10px] leading-snug text-[#64748b]">
+          {payload.aiEvidence ? (
+            <div className="mb-2 space-y-2">
+              <TrustBadge state={payload.aiEvidence.trust_state} />
+              {payload.aiEvidence.insufficient_evidence && payload.aiEvidence.reason ? (
+                <p className="text-[10px] text-amber-900/90">{payload.aiEvidence.reason}</p>
+              ) : null}
+              <CitationList citations={payload.aiEvidence.citations} compact onOpenSource={onCitationOpen} />
+            </div>
+          ) : null}
           {payload.citationFooter}
           {payload.lastCreditDebit != null ? (
             <span className="mt-1 block text-[#5b21b6]/80">Last activation: {payload.lastCreditDebit} credits</span>

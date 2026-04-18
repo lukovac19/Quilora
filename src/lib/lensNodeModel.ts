@@ -1,5 +1,7 @@
 /** EP-05 Lens node — payload, activation credits, deterministic mock outputs for checklist UI. */
 
+import type { AiEvidenceBundle } from './ai/types/aiEvidenceBundle';
+
 export type LensSubtype = 'plot_events' | 'persona' | 'theme' | 'symbol' | 'idea';
 
 export type PersonaTraitChip = {
@@ -25,6 +27,8 @@ export type LensNodePayload = {
   lastCreditDebit?: number;
   citationFooter: string;
   outputBody: string;
+  /** RAG / structured grounding (Canvas AI). */
+  aiEvidence?: AiEvidenceBundle | null;
   personaCharacterName?: string;
   personaTraits?: PersonaTraitChip[];
   symbolMotifActiveTab?: 'symbolism' | 'motif';
@@ -199,6 +203,35 @@ export function parseLensPayload(raw: unknown): LensNodePayload | null {
       }))
     : undefined;
   const tab = String(p.symbolMotifActiveTab ?? 'symbolism');
+  const aiRaw = p.aiEvidence;
+  let aiEvidence: AiEvidenceBundle | null | undefined;
+  if (aiRaw === null) aiEvidence = null;
+  else if (aiRaw && typeof aiRaw === 'object') {
+    const a = aiRaw as Record<string, unknown>;
+    const citRaw = a.citations;
+    const citations = Array.isArray(citRaw)
+      ? (citRaw as Record<string, unknown>[]).map((c) => ({
+          document_id: String(c.document_id ?? ''),
+          source_title: String(c.source_title ?? ''),
+          page_number: Number(c.page_number ?? 0) || 0,
+          chunk_id: String(c.chunk_id ?? ''),
+          quoted_text: String(c.quoted_text ?? ''),
+          start_char: Number(c.start_char ?? 0) || 0,
+          end_char: Number(c.end_char ?? 0) || 0,
+        }))
+      : [];
+    aiEvidence = {
+      grounded: Boolean(a.grounded),
+      confidence: Number(a.confidence ?? 0) || 0,
+      citations,
+      insufficient_evidence: Boolean(a.insufficient_evidence),
+      reason: String(a.reason ?? ''),
+      trust_state:
+        a.trust_state === 'ungrounded' || a.trust_state === 'insufficient' || a.trust_state === 'unanchored' || a.trust_state === 'grounded'
+          ? a.trust_state
+          : 'insufficient',
+    };
+  }
   return {
     subtype,
     linkedSourceNodeId: linked,
@@ -206,6 +239,7 @@ export function parseLensPayload(raw: unknown): LensNodePayload | null {
     lastCreditDebit: p.lastCreditDebit != null ? Number(p.lastCreditDebit) : undefined,
     citationFooter: String(p.citationFooter ?? ''),
     outputBody: String(p.outputBody ?? ''),
+    aiEvidence,
     personaCharacterName: p.personaCharacterName != null ? String(p.personaCharacterName) : undefined,
     personaTraits,
     symbolMotifActiveTab: tab === 'motif' ? 'motif' : 'symbolism',

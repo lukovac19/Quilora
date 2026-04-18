@@ -4,6 +4,9 @@ import type { CanvasNode } from '../../lib/canvasNodeModel';
 import { NODE_LABELS } from '../../lib/canvasNodeModel';
 import type { ConnectorNodePayload } from '../../lib/connectorNodeModel';
 import { CONNECTOR_LINK_LABELS } from '../../lib/connectorNodeModel';
+import type { GroundedCitation } from '../../lib/ai/types/groundedAnswer';
+import { CitationList } from '../citations/CitationList';
+import { TrustBadge } from '../citations/TrustBadge';
 
 /** EP-07 — Connector hub block between two endpoints. */
 export function ConnectorBlockChrome({
@@ -16,6 +19,7 @@ export function ConnectorBlockChrome({
   onDuplicate,
   onResizePointerDown,
   onConnectorDragStart,
+  onCitationOpen,
 }: {
   node: CanvasNode;
   payload: ConnectorNodePayload;
@@ -26,6 +30,7 @@ export function ConnectorBlockChrome({
   onDuplicate: (id: string) => void;
   onResizePointerDown: (event: React.MouseEvent, nodeId: string) => void;
   onConnectorDragStart: (nodeId: string, event: React.PointerEvent) => void;
+  onCitationOpen?: (c: GroundedCitation) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showConnectHandle, setShowConnectHandle] = useState(false);
@@ -144,6 +149,15 @@ export function ConnectorBlockChrome({
             {payload.aiAnalysisBody.trim() || '—'}
           </div>
         )}
+        {payload.aiEvidence ? (
+          <div className="space-y-2 rounded-xl border border-[#0f172a]/8 bg-white/50 px-2 py-2">
+            <TrustBadge state={payload.aiEvidence.trust_state} />
+            {payload.aiEvidence.insufficient_evidence && payload.aiEvidence.reason ? (
+              <p className="text-[10px] text-amber-950/90">{payload.aiEvidence.reason}</p>
+            ) : null}
+            <CitationList citations={payload.aiEvidence.citations} compact onOpenSource={onCitationOpen} />
+          </div>
+        ) : null}
         <p data-source-citation className="text-[10px] font-medium text-[#64748b]">
           {payload.sourceCitation || '—'}
         </p>

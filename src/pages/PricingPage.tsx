@@ -85,13 +85,13 @@ export function PricingPage() {
         { replace: true },
       );
       if (!res.ok) {
-        if (res.reason === 'no_paddle' || res.reason === 'no_price') {
+        if (res.reason === 'not_configured') {
           if (import.meta.env.DEV) toast.message(res.message);
         } else {
           toast.error(res.message);
         }
       } else {
-        toast.success('Checkout opened — credits apply after Paddle confirms payment.');
+        toast.success('Checkout opened — credits apply after payment is confirmed.');
       }
     })();
     return () => {
@@ -266,9 +266,9 @@ export function PricingPage() {
                   return;
                 }
                 void openPaddleCheckout({ product: 'boost_pack', userId: user.id, email: user.email }).then((res) => {
-                  if (!res.ok && res.reason !== 'no_paddle' && res.reason !== 'no_price') toast.error(res.message);
+                  if (!res.ok && res.reason !== 'not_configured') toast.error(res.message);
                   else if (!res.ok && import.meta.env.DEV) toast.message(res.message);
-                  else if (res.ok) toast.success('Checkout opened — credits apply after Paddle confirms payment.');
+                  else if (res.ok) toast.success('Checkout opened — credits apply after payment is confirmed.');
                 });
               }}
               className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#266ba7] px-8 py-3 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/30"

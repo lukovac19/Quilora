@@ -8,7 +8,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** EP-02 Boost Pack Modal — $1.99 = 200 credits (Paddle confirms before balance updates). */
+/** EP-02 Boost Pack Modal — $1.99 = 200 credits (confirmed by billing webhooks before balance updates). */
 export function BoostPackModal({ open, onClose }: Props) {
   const { user } = useApp();
 
@@ -26,11 +26,11 @@ export function BoostPackModal({ open, onClose }: Props) {
       email: user.email,
     });
     if (res.ok) {
-      toast.success('Checkout opened — 200 credits apply after Paddle confirms payment.');
+      toast.success('Checkout opened — 200 credits apply after payment is confirmed.');
       onClose();
       return;
     }
-    if (res.reason === 'no_paddle' || res.reason === 'no_price') {
+    if (res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
       else toast.error('Checkout is not configured.');
       return;
@@ -50,7 +50,7 @@ export function BoostPackModal({ open, onClose }: Props) {
         <p id="boost-price-display" className="mt-3 text-lg font-semibold text-[#7bbdf3]">
           $1.99 — 200 credits
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-white/65">One-time top-up via Paddle. Credits appear in your balance after payment completes.</p>
+        <p className="mt-3 text-sm leading-relaxed text-white/65">One-time top-up. Credits appear in your balance after payment completes.</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             id="confirm-purchase-btn"

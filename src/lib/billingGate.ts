@@ -1,12 +1,12 @@
 import type { QuiloraProfileTier } from '../context/AppContext';
 
-/** EP-02: paid Sage/Genesis, active Paddle subscription, or explicit Bookworm plan confirmation. */
+/** EP-02: paid Sage/Genesis, active paid subscription (Polar), or explicit Bookworm plan confirmation. */
 export function computeBillingGatePassed(params: {
   profileTier: QuiloraProfileTier;
   planSelectionCompleted: boolean;
-  hasActivePaddleSubscription: boolean;
+  hasActivePaidSubscription: boolean;
 }): boolean {
   if (params.profileTier === 'bibliophile' || params.profileTier === 'genesis') return true;
-  if (params.hasActivePaddleSubscription) return true;
+  if (params.hasActivePaidSubscription) return true;
   return params.planSelectionCompleted;
 }

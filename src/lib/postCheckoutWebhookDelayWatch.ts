@@ -5,13 +5,13 @@ type RefreshUser = () => Promise<{ billingGatePassed: boolean } | null>;
 
 let refreshUser: RefreshUser | null = null;
 
-/** Wired from `AppProvider` so Paddle overlay can schedule EC-03 support alerts without React coupling. */
+/** Wired from `AppProvider` so checkout flows can schedule EC-03 support alerts without React coupling. */
 export function registerPostCheckoutWebhookDelayWatch(refresh: RefreshUser) {
   refreshUser = refresh;
 }
 
 /**
- * EC-03 — After Paddle `checkout.completed`, poll until `billingGatePassed` or ~5 minutes, then notify support.
+ * EC-03 — After checkout redirect, poll until `billingGatePassed` or ~5 minutes, then notify support.
  */
 export function scheduleWebhookDelayWatchAfterCheckout(userId: string, productKind: string) {
   if (!refreshUser) return;

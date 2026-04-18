@@ -63,13 +63,16 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardFrame2 } from "./pages/DashboardFrame2";
 import { SandboxLoadingFrame } from "./pages/SandboxLoadingFrame";
+import { AiRagDebugPage } from "./pages/AiRagDebugPage";
+import { BillingSuccessPage } from "./pages/BillingSuccessPage";
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: RootLayout,
     errorElement: <RouteErrorFallback />,
     children: [
-      { index: true, Component: QuiloraLandingPage },
+      { index: true, Component: PreLaunchPage },
+      { path: "landing", Component: QuiloraLandingPage },
       {
         path: "early-access/genesis-welcome",
         element: <Navigate to="/early-access" replace />,
@@ -85,7 +88,7 @@ export const router = createBrowserRouter([
       { path: "early-access", Component: PreLaunchEarlyAccessPage },
       { path: "early-access/promises", Component: PrelaunchPromisesPage },
       { path: "home", Component: QuiloraLandingPage },
-      { path: "pre-launch", Component: PreLaunchPage },
+      { path: "pre-launch", element: <Navigate to="/" replace /> },
       { path: "pre-launch/early-access", element: <Navigate to="/early-access" replace /> },
       { 
         path: "auth", 
@@ -114,6 +117,14 @@ export const router = createBrowserRouter([
       { 
         path: "pricing", 
         Component: PricingPage 
+      },
+      {
+        path: "billing/success",
+        element: (
+          <ProtectedRoute>
+            <BillingSuccessPage />
+          </ProtectedRoute>
+        ),
       },
       { 
         path: "faq", 
@@ -227,6 +238,7 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      { path: "dev/ai-rag", Component: AiRagDebugPage },
       { path: "*", Component: NotFoundPage },
     ],
   },

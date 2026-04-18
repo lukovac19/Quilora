@@ -19,7 +19,7 @@ import { ScrollReveal } from '../ScrollReveal';
 export type PricingPlansBlockProps = {
   /** Early access: Monthly/Yearly toggle and plan cards only (no genesis banner, tax line, comparison table). */
   earlyAccessPricing?: boolean;
-  /** When set, Paddle `checkout.completed` in this tab invokes this (early access and default pricing). */
+  /** When checkout cannot open (e.g. dev without secrets), optional fallback callback. */
   onCheckoutCompleted?: (product: CheckoutProductKey) => void;
 };
 
@@ -87,7 +87,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       email: user.email,
       ...completedOpt,
     });
-    if (!res.ok && res.reason === 'no_price' && displayedBilling) {
+    if (!res.ok && displayedBilling && primary !== monthlyKey) {
       res = await openPaddleCheckout({
         product: monthlyKey,
         userId: user.id,
@@ -99,7 +99,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       toast.error(res.message);
       return;
     }
-    if (!res.ok && (res.reason === 'no_paddle' || res.reason === 'no_price')) {
+    if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(primary);
@@ -116,14 +116,14 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
       return;
     }
-    const yearlyKey: CheckoutProductKey = 'bibliophile_yearly';
-    const monthlyKey: CheckoutProductKey = 'bibliophile_monthly';
+    const yearlyKey: CheckoutProductKey = 'sage_yearly';
+    const monthlyKey: CheckoutProductKey = 'sage_monthly';
     const primary = displayedBilling ? yearlyKey : monthlyKey;
     let res = await openPaddleCheckout({ product: primary, userId: user.id, email: user.email, ...completedOpt });
-    if (!res.ok && res.reason === 'no_price' && displayedBilling) {
+    if (!res.ok && displayedBilling && primary !== monthlyKey) {
       res = await openPaddleCheckout({ product: monthlyKey, userId: user.id, email: user.email, ...completedOpt });
     }
-    if (!res.ok && (res.reason === 'no_paddle' || res.reason === 'no_price')) {
+    if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(primary);
@@ -136,13 +136,17 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
+    if (!user?.id) {
+      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'));
+      return;
+    }
     if (user && !user.emailConfirmed) {
       toast.error('Please verify your email before checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
       return;
     }
-    const checkoutUserId = user?.id ?? 'guest';
-    const checkoutEmail = user?.email;
+    const checkoutUserId = user.id;
+    const checkoutEmail = user.email;
     const gate = user ? assertPrelaunchCheckoutAllowed(user, 'bookworm') : { ok: true };
     if (!gate.ok) {
       setDupModal({ open: true, message: gate.message });
@@ -159,7 +163,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       email: checkoutEmail,
       ...completedOpt,
     });
-    if (!res.ok && (res.reason === 'no_paddle' || res.reason === 'no_price')) {
+    if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(product);
@@ -172,19 +176,23 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
 
   const lockEarlySage = useCallback(async () => {
+    if (!user?.id) {
+      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'));
+      return;
+    }
     if (user && !user.emailConfirmed) {
       toast.error('Please verify your email before checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
       return;
     }
-    const checkoutUserId = user?.id ?? 'guest';
-    const checkoutEmail = user?.email;
+    const checkoutUserId = user.id;
+    const checkoutEmail = user.email;
     const gate = user ? assertPrelaunchCheckoutAllowed(user, 'sage') : { ok: true };
     if (!gate.ok) {
       setDupModal({ open: true, message: gate.message });
       return;
     }
-    const product: CheckoutProductKey = displayedBilling ? 'bibliophile_yearly' : 'bibliophile_monthly';
+    const product: CheckoutProductKey = displayedBilling ? 'sage_yearly' : 'sage_monthly';
     if (import.meta.env.DEV) {
       onCheckoutCompleted?.(product);
       return;
@@ -195,7 +203,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       email: checkoutEmail,
       ...completedOpt,
     });
-    if (!res.ok && (res.reason === 'no_paddle' || res.reason === 'no_price')) {
+    if (!res.ok && res.reason === 'not_configured') {
       if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(product);
@@ -511,7 +519,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       ) : null}
 
       {!earlyAccessPricing ? (
-        <p className="mb-8 text-center text-xs text-white/45">Prices shown are tax-exclusive; Paddle shows tax before you pay.</p>
+        <p className="mb-8 text-center text-xs text-white/45">Prices shown are tax-exclusive; applicable tax may appear at checkout.</p>
       ) : null}
 
       <div className="mb-12 flex flex-col items-center gap-3">
@@ -746,7 +754,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
           </div>
 
           <p id="tax-note" className="mt-4 text-center text-xs text-white/40">
-            Tax (if any) is calculated by Paddle at checkout from your billing location.
+            Tax (if any) is calculated at checkout from your billing location.
           </p>
         </>
       ) : null}

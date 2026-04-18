@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+import { quiloraAiProxyPlugin } from './vite.quiloraAiProxy';
 
 function figmaAssetResolver() {
   return {
@@ -20,7 +21,7 @@ export default defineConfig(({ mode }) => {
   const deepseekKey = env.DEEPSEEK_API_KEY?.trim() ?? '';
 
   return {
-    plugins: [react(), tailwindcss(), figmaAssetResolver()],
+    plugins: [react(), tailwindcss(), figmaAssetResolver(), quiloraAiProxyPlugin()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       alias: {

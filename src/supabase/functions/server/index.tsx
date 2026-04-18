@@ -1,48 +1,59 @@
-import { Hono } from 'npm:hono';
-import { cors } from 'npm:hono/cors';
-import { logger } from 'npm:hono/logger';
-import { createClient } from 'jsr:@supabase/supabase-js@2';
-import * as kv from './kv_store.tsx';
-import { CREDIT_RULES, TIER_LIMITS, type QuiloraTier } from './billing_config.ts';
-import {
-  applyBibliophileMonthlyRenewal,
-  applyBookwormMonthlyRenewal,
-  applyBookwormSandboxReadonly,
-  chargeCredits,
-  ensureBillingState,
-  getLowBalanceStatus,
-  getProfile,
-  getTierEntitlements,
-  grantCredits,
-  markPrelaunchPurchaseProfile,
-  setPlanSelectionCompleted,
-  setTier,
-} from './credit_service.ts';
-import {
-  getGenesisInventory,
-  hasProcessedPaddleEvent,
-  markPaddleEventProcessed,
-  verifyPaddleSignature,
-} from './paddle_service.ts';
-import {
-  adminLinkOrphanPayment,
-  assertPrelaunchWebhookPurchaseAllowed,
-  cancelGenesisReleaseSeat,
-  cancelPrelaunchBookwormSage,
-  consumeCheckoutPassthrough,
-  createCheckoutPassthrough,
-  enqueueEmail,
-  getPublicLaunchComplete,
-  handleTransactionCompleted,
-  processEmailOutboxBatch,
-  reconcileOrphanPayments,
-  reportWebhookDelayForUser,
-  runNinetyDayRefundCheck,
-  setPublicLaunchComplete,
-  validatePassthroughForCheckout,
-} from './prelaunch_v4_service.ts';
+  import { Hono } from 'npm:hono';
+  import { cors } from 'npm:hono/cors';
+  import { logger } from 'npm:hono/logger';
+  import { createClient } from 'jsr:@supabase/supabase-js@2';
+  import * as kv from './kv_store.tsx';
+  import { CREDIT_RULES, TIER_LIMITS, type QuiloraTier } from './billing_config.ts';
+  import {
+    applyBibliophileMonthlyRenewal,
+    applyBookwormMonthlyRenewal,
+    applyBookwormSandboxReadonly,
+    chargeCredits,
+    ensureBillingState,
+    getLowBalanceStatus,
+    getProfile,
+    getTierEntitlements,
+    grantCredits,
+    markPrelaunchPurchaseProfile,
+    setPlanSelectionCompleted,
+    setTier,
+  } from './credit_service.ts';
+  import {
+    getGenesisInventory,
+    hasProcessedPaddleEvent,
+    markPaddleEventProcessed,
+    verifyPaddleSignature,
+  } from './paddle_service.ts';
+  import {
+    adminLinkOrphanPayment,
+    assertPrelaunchWebhookPurchaseAllowed,
+    cancelGenesisReleaseSeat,
+    cancelPrelaunchBookwormSage,
+    consumeCheckoutPassthrough,
+    createCheckoutPassthrough,
+    enqueueEmail,
+    getPublicLaunchComplete,
+    handleTransactionCompleted,
+    processEmailOutboxBatch,
+    reconcileOrphanPayments,
+    reportWebhookDelayForUser,
+    runNinetyDayRefundCheck,
+    setPublicLaunchComplete,
+    validatePassthroughForCheckout,
+  } from './prelaunch_v4_service.ts';
+  import {
+    buildPolarBillingMe,
+    createPolarCheckoutSession,
+    createPolarCustomerPortalSession,
+    fulfillFromCheckoutApi,
+    markPolarEventError,
+    markPolarEventStart,
+    processPolarWebhookEnvelope,
+    verifyPolarWebhook,
+  } from './polar_billing.ts';
+  import { isPolarPlanKey } from './polar_plan.ts';
 
-const app = new Hono();
+  const app = new Hono();
 
 type ChatTurn = { role: string; content: string };
 
@@ -806,6 +817,108 @@ app.post('/make-server-5a3d4811/billing/cancel-genesis', async (c) => {
   } catch (error) {
     console.error('cancel-genesis', error);
     return c.json({ error: 'cancel_genesis_failed' }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/billing/create-checkout-session', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const body = (await c.req.json()) as {
+      planKey?: string;
+      userId?: string;
+      userEmail?: string;
+      successUrl?: string;
+      returnUrl?: string | null;
+      genesisSlotPricePoint?: '80' | '119' | null;
+    };
+    if (!body.planKey || !isPolarPlanKey(body.planKey)) return c.json({ error: 'Invalid planKey' }, 400);
+    if (body.userId !== userId) return c.json({ error: 'Forbidden' }, 403);
+    const email = String(body.userEmail ?? '').trim();
+    if (!email) return c.json({ error: 'Missing userEmail' }, 400);
+    const successUrl = String(body.successUrl ?? '').trim();
+    if (!successUrl) return c.json({ error: 'Missing successUrl' }, 400);
+    const { url } = await createPolarCheckoutSession({
+      planKey: body.planKey,
+      userId,
+      userEmail: email,
+      successUrl,
+      returnUrl: body.returnUrl ?? null,
+      genesisSlotPricePoint: body.genesisSlotPricePoint ?? null,
+    });
+    return c.json({ checkoutUrl: url });
+  } catch (error) {
+    console.error('create-checkout-session', error);
+    const message = error instanceof Error ? error.message : 'checkout_failed';
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.get('/make-server-5a3d4811/billing/me', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const payload = await buildPolarBillingMe(supabase, userId);
+    return c.json(payload);
+  } catch (error) {
+    console.error('billing/me', error);
+    return c.json({ error: 'billing_me_failed' }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/billing/customer-portal', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const body = (await c.req.json()) as { returnUrl?: string };
+    const returnUrl = String(body.returnUrl ?? '').trim();
+    if (!returnUrl) return c.json({ error: 'Missing returnUrl' }, 400);
+    const { customerPortalUrl } = await createPolarCustomerPortalSession({ userId, returnUrl });
+    return c.json({ customerPortalUrl });
+  } catch (error) {
+    console.error('customer-portal', error);
+    const message = error instanceof Error ? error.message : 'portal_failed';
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/billing/sync-checkout', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const body = (await c.req.json()) as { checkoutId?: string };
+    const checkoutId = String(body.checkoutId ?? '').trim();
+    if (!checkoutId) return c.json({ error: 'Missing checkoutId' }, 400);
+    await fulfillFromCheckoutApi(supabase, checkoutId, userId);
+    const payload = await buildPolarBillingMe(supabase, userId);
+    return c.json({ ok: true, ...payload });
+  } catch (error) {
+    console.error('sync-checkout', error);
+    const message = error instanceof Error ? error.message : 'sync_failed';
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/billing/polar-webhook', async (c) => {
+  const rawBody = await c.req.text();
+  const polarEventId = c.req.header('webhook-id')?.trim() || `polar_body_${crypto.randomUUID()}`;
+  try {
+    const body = verifyPolarWebhook(rawBody, c.req.raw.headers);
+    const envelope = body as Record<string, unknown>;
+    const eventType = String(envelope.type ?? '');
+    const first = await markPolarEventStart(supabase, polarEventId, eventType);
+    if (!first) return c.json({ ok: true, duplicate: true });
+    try {
+      await processPolarWebhookEnvelope(supabase, envelope, polarEventId);
+    } catch (inner) {
+      console.error('polar_webhook_process', inner);
+      await markPolarEventError(supabase, polarEventId, inner instanceof Error ? inner.message : String(inner));
+      return c.json({ error: 'processing_failed' }, 500);
+    }
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error('polar_webhook', error);
+    return c.json({ error: 'invalid_webhook' }, 400);
   }
 });
 

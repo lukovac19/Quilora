@@ -4,6 +4,9 @@ import type { CanvasNode } from '../../lib/canvasNodeModel';
 import { NODE_LABELS } from '../../lib/canvasNodeModel';
 import type { FreestyleNodePayload } from '../../lib/freestyleNodeModel';
 import { countIncludedContextTurns } from '../../lib/freestyleNodeModel';
+import type { GroundedCitation } from '../../lib/ai/types/groundedAnswer';
+import { CitationList } from '../citations/CitationList';
+import { TrustBadge } from '../citations/TrustBadge';
 
 const BUBBLE_DRAG_MIME = 'application/quilora-freestyle-bubble';
 
@@ -22,6 +25,7 @@ export function FreestyleBlockChrome({
   onSendPrompt,
   onToggleUserTurnIncluded,
   onSendAssistantToCanvas,
+  onCitationOpen,
 }: {
   node: CanvasNode;
   payload: FreestyleNodePayload;
@@ -36,6 +40,7 @@ export function FreestyleBlockChrome({
   onSendPrompt: (nodeId: string, text: string) => void;
   onToggleUserTurnIncluded: (nodeId: string, messageId: string, included: boolean) => void;
   onSendAssistantToCanvas: (nodeId: string, messageId: string) => void;
+  onCitationOpen?: (c: GroundedCitation) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -232,6 +237,15 @@ export function FreestyleBlockChrome({
                   >
                     <SendHorizontal className="h-3.5 w-3.5" strokeWidth={2.25} />
                   </button>
+                ) : null}
+                {m.aiEvidence ? (
+                  <div className="mt-2 border-t border-[#0f172a]/10 pt-2">
+                    <TrustBadge state={m.aiEvidence.trust_state} />
+                    {m.aiEvidence.insufficient_evidence && m.aiEvidence.reason ? (
+                      <p className="mt-1 text-[10px] text-amber-950/90">{m.aiEvidence.reason}</p>
+                    ) : null}
+                    <CitationList citations={m.aiEvidence.citations} compact onOpenSource={onCitationOpen} />
+                  </div>
                 ) : null}
               </div>
             );

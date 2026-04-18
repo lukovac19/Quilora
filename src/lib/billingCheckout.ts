@@ -1,211 +1,171 @@
-import type { Paddle, PaddleEventData } from '@paddle/paddle-js';
-import { CheckoutEventNames, initializePaddle } from '@paddle/paddle-js';
+import { quiloraPublicAppUrl } from './billing/polar';
+import type { InternalPlanKey } from './billing/types';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from './quiloraEdge';
 import { scheduleWebhookDelayWatchAfterCheckout } from './postCheckoutWebhookDelayWatch';
 import { supabase } from './supabase';
+
+/** Includes legacy Paddle product ids still referenced in a few UI call sites. */
+export type CheckoutProductKey =
+  | InternalPlanKey
+  | 'genesis_80'
+  | 'genesis_119'
+  | 'bibliophile_monthly'
+  | 'bibliophile_yearly';
 
 export type GenesisInventory = {
   genesis80: { sold: number; cap: number; remaining: number };
   genesis119: { sold: number; cap: number; remaining: number };
 };
 
-export type CheckoutProductKey =
-  | 'bookworm_monthly'
-  | 'bookworm_yearly'
-  | 'bibliophile_monthly'
-  | 'bibliophile_yearly'
-  | 'genesis_80'
-  | 'genesis_119'
-  | 'boost_pack';
+const AFTER_CHECKOUT_NAV_KEY = 'quilora_after_checkout_nav';
 
-const PRICE_ENV_KEYS: Record<CheckoutProductKey, string> = {
-  bookworm_monthly: 'VITE_PADDLE_PRICE_BOOKWORM_MONTHLY',
-  bookworm_yearly: 'VITE_PADDLE_PRICE_BOOKWORM_YEARLY',
-  bibliophile_monthly: 'VITE_PADDLE_PRICE_BIBLIOPHILE_MONTHLY',
-  bibliophile_yearly: 'VITE_PADDLE_PRICE_BIBLIOPHILE_YEARLY',
-  genesis_80: 'VITE_PADDLE_PRICE_GENESIS_80',
-  genesis_119: 'VITE_PADDLE_PRICE_GENESIS_119',
-  boost_pack: 'VITE_PADDLE_PRICE_BOOST_PACK',
-};
-
-function priceIdFor(product: CheckoutProductKey): string | null {
-  const envName = PRICE_ENV_KEYS[product];
-  const raw = (import.meta.env as Record<string, string | undefined>)[envName];
-  const v = raw?.trim();
-  return v || null;
-}
-
-export function paddleClientConfigured(): boolean {
-  return Boolean((import.meta.env.VITE_PADDLE_CLIENT_TOKEN as string | undefined)?.trim());
-}
-
-export function priceConfigured(product: CheckoutProductKey): boolean {
-  return Boolean(priceIdFor(product));
-}
-
-let paddleSingleton: Promise<Paddle | null> | null = null;
-
-/** Fired once per checkout when `checkout.completed` is received (Paddle overlay). */
-let pendingOnCheckoutCompleted: ((product: CheckoutProductKey) => void) | undefined;
-
-function isCheckoutProductKey(value: string): value is CheckoutProductKey {
-  return (
-    value === 'bookworm_monthly' ||
-    value === 'bookworm_yearly' ||
-    value === 'bibliophile_monthly' ||
-    value === 'bibliophile_yearly' ||
-    value === 'genesis_80' ||
-    value === 'genesis_119' ||
-    value === 'boost_pack'
-  );
-}
-
-function paddleGlobalEventCallback(event: PaddleEventData): void {
-  if (event.name !== CheckoutEventNames.CHECKOUT_COMPLETED) return;
-  const raw = event.data?.custom_data;
-  if (raw == null || typeof raw !== 'object') return;
-  const o = raw as Record<string, unknown>;
-  const pk =
-    (typeof o.productKind === 'string' && o.productKind) ||
-    (typeof o.product_kind === 'string' && o.product_kind) ||
-    '';
-  if (!pk || !isCheckoutProductKey(pk)) return;
-  const cb = pendingOnCheckoutCompleted;
-  pendingOnCheckoutCompleted = undefined;
-  cb?.(pk);
-  const uid = typeof o.userId === 'string' ? o.userId.trim() : '';
-  if (uid) scheduleWebhookDelayWatchAfterCheckout(uid, pk);
-}
-
-async function getPaddle(): Promise<Paddle | null> {
-  const token = (import.meta.env.VITE_PADDLE_CLIENT_TOKEN as string | undefined)?.trim();
-  if (!token) return null;
-  if (!paddleSingleton) {
-    const envSetting = import.meta.env.VITE_PADDLE_ENVIRONMENT as 'sandbox' | 'production' | undefined;
-    const environment =
-      envSetting ?? (token.startsWith('live_') ? 'production' : 'sandbox');
-    paddleSingleton = initializePaddle({
-      environment,
-      token,
-      eventCallback: paddleGlobalEventCallback,
-    }).then((p) => p ?? null);
-  }
-  return paddleSingleton;
-}
+/** When set, after a successful Genesis checkout we immediately start this plan checkout (bundle: LTD + Sage year). */
+export const POLAR_POST_GENESIS_PLAN_KEY = 'quilora_post_genesis_plan_key';
 
 export async function fetchGenesisInventory(): Promise<GenesisInventory | null> {
   try {
-    const data = await quiloraEdgeGetJson<{ inventory?: GenesisInventory }>(
-      `${QUILORA_EDGE_SLUG}/billing/genesis-inventory`,
-    );
+    const data = await quiloraEdgeGetJson<{ inventory?: GenesisInventory }>(`${QUILORA_EDGE_SLUG}/billing/genesis-inventory`);
     return data.inventory ?? null;
   } catch {
     return null;
   }
 }
 
-export function isGenesisSoldOut(
-  inventory: GenesisInventory | null,
-  product: 'genesis_80' | 'genesis_119',
-): boolean {
+export function isGenesisSoldOut(inventory: GenesisInventory | null, slot: '80' | '119' | 'genesis_80' | 'genesis_119'): boolean {
   if (!inventory) return false;
-  const row = product === 'genesis_80' ? inventory.genesis80 : inventory.genesis119;
+  const normalized = slot === 'genesis_80' || slot === '80' ? '80' : '119';
+  const row = normalized === '80' ? inventory.genesis80 : inventory.genesis119;
   return row.remaining <= 0;
 }
 
-/** Remaining Lifetime Deal seats from DB-backed inventory (both tiers). */
 export function lifetimeDealSeatsRemaining(inventory: GenesisInventory | null): number | null {
   if (!inventory) return null;
   return inventory.genesis80.remaining + inventory.genesis119.remaining;
 }
 
-export type OpenCheckoutResult = { ok: true } | { ok: false; reason: 'no_paddle' | 'no_price' | 'sold_out' | 'paddle_error'; message: string };
+export type OpenCheckoutResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_configured' | 'network' | 'sold_out'; message: string };
+
+export type PlanCheckoutParams = {
+  planKey: InternalPlanKey;
+  userId: string;
+  email: string;
+  /** Where to navigate after successful return + sync (default `/onboarding`). */
+  afterSuccessNavigate?: string;
+  genesisSlotPricePoint?: '80' | '119' | null;
+};
 
 /**
- * Opens Paddle overlay checkout when client token and price ID env vars are set.
- * Passes custom_data expected by the Edge webhook (`userId`, `productKind`, `tier` where relevant).
+ * Server-created Polar checkout (redirect). Never uses organization tokens on the client.
  */
-export async function openPaddleCheckout(params: {
+export async function openPlanCheckout(params: PlanCheckoutParams): Promise<OpenCheckoutResult> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    return { ok: false, reason: 'not_configured', message: 'Please sign in to continue.' };
+  }
+  if (!params.email?.trim()) {
+    return { ok: false, reason: 'not_configured', message: 'Missing email for checkout.' };
+  }
+
+  if (params.planKey === 'genesis_lifetime') {
+    const inv = await fetchGenesisInventory();
+    const slot = params.genesisSlotPricePoint === '119' ? '119' : '80';
+    if (isGenesisSoldOut(inv, slot)) {
+      return { ok: false, reason: 'sold_out', message: 'That Genesis tier is sold out.' };
+    }
+  }
+
+  const appUrl = quiloraPublicAppUrl();
+  const successUrl = `${appUrl}/billing/success?checkout_id={CHECKOUT_ID}`;
+  const returnUrl = `${appUrl}/pricing?checkout=cancelled`;
+
+  try {
+    const nav = params.afterSuccessNavigate ?? '/onboarding';
+    try {
+      sessionStorage.setItem(AFTER_CHECKOUT_NAV_KEY, nav);
+    } catch {
+      /* ignore */
+    }
+    const data = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
+      `${QUILORA_EDGE_SLUG}/billing/create-checkout-session`,
+      token,
+      {
+        planKey: params.planKey,
+        userId: params.userId,
+        userEmail: params.email.trim(),
+        successUrl,
+        returnUrl,
+        genesisSlotPricePoint: params.genesisSlotPricePoint ?? null,
+      },
+    );
+    if (data.error || !data.checkoutUrl) {
+      return {
+        ok: false,
+        reason: 'network',
+        message: data.error ?? 'Could not start checkout.',
+      };
+    }
+    scheduleWebhookDelayWatchAfterCheckout(params.userId, params.planKey);
+    window.location.href = data.checkoutUrl;
+    return { ok: true };
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : 'Checkout request failed.';
+    return { ok: false, reason: 'network', message };
+  }
+}
+
+function mapLegacyProductKey(product: CheckoutProductKey): {
+  planKey: InternalPlanKey;
+  genesisSlotPricePoint?: '80' | '119' | null;
+} {
+  switch (product) {
+    case 'bibliophile_monthly':
+      return { planKey: 'sage_monthly' };
+    case 'bibliophile_yearly':
+      return { planKey: 'sage_yearly' };
+    case 'genesis_80':
+      return { planKey: 'genesis_lifetime', genesisSlotPricePoint: '80' };
+    case 'genesis_119':
+      return { planKey: 'genesis_lifetime', genesisSlotPricePoint: '119' };
+    default:
+      return { planKey: product as InternalPlanKey };
+  }
+}
+
+type LegacyOpenCheckoutParams = {
   product: CheckoutProductKey;
   userId: string;
   email?: string | null;
-  /** Invoked when Paddle emits `checkout.completed` for this checkout (same tab). */
   onCheckoutCompleted?: (product: CheckoutProductKey) => void;
-}): Promise<OpenCheckoutResult> {
-  const priceId = priceIdFor(params.product);
-  if (!paddleClientConfigured()) {
-    return { ok: false, reason: 'no_paddle', message: 'Checkout is not configured (missing client token).' };
-  }
-  if (!priceId) {
-    return { ok: false, reason: 'no_price', message: 'Checkout is not configured (missing price ID for this product).' };
-  }
+};
 
-  if (params.product === 'genesis_80' || params.product === 'genesis_119') {
-    const inv = await fetchGenesisInventory();
-    if (isGenesisSoldOut(inv, params.product)) {
-      return { ok: false, reason: 'sold_out', message: 'This tier is sold out' };
-    }
-  }
-
-  const paddle = await getPaddle();
-  if (!paddle?.Checkout?.open) {
-    return { ok: false, reason: 'paddle_error', message: 'Could not initialize Paddle checkout.' };
-  }
-
-  const productKind: string = params.product;
-  let tier: string | undefined;
-  if (params.product.startsWith('bookworm')) tier = 'bookworm';
-  if (params.product.startsWith('bibliophile')) tier = 'bibliophile';
-
-  const customData: Record<string, string> = {
+/** Back-compat entry point: maps legacy `product` ids to Polar `planKey` and starts redirect checkout. */
+export async function openPaddleCheckout(params: LegacyOpenCheckoutParams): Promise<OpenCheckoutResult> {
+  const email = String(params.email ?? '').trim();
+  if (!email) return { ok: false, reason: 'not_configured', message: 'Email required for checkout.' };
+  const { planKey, genesisSlotPricePoint } = mapLegacyProductKey(params.product);
+  return openPlanCheckout({
+    planKey,
     userId: params.userId,
-    productKind,
-  };
-  if (tier) customData.tier = tier;
+    email,
+    afterSuccessNavigate: params.onCheckoutCompleted ? '/onboarding' : undefined,
+    genesisSlotPricePoint: genesisSlotPricePoint ?? null,
+  });
+}
 
-  try {
-    const { data: auth } = await supabase.auth.getSession();
-    const bearer = auth.session?.access_token;
-    const em = params.email?.trim();
-    if (bearer && em) {
-      try {
-        const pt = await quiloraEdgePostJson<{ passthroughToken?: string }>(
-          `${QUILORA_EDGE_SLUG}/billing/checkout-passthrough`,
-          bearer,
-          { expectedCheckoutEmail: em },
-        );
-        if (pt.passthroughToken) customData.passthroughToken = pt.passthroughToken;
-      } catch {
-        /* passthrough optional if edge unreachable */
-      }
-    }
-  } catch {
-    /* ignore auth for passthrough */
-  }
+/** Polar checkout is always server-configured; “not configured” is returned as a failed openPlanCheckout result. */
+export function polarCheckoutConfigured(): boolean {
+  return true;
+}
 
-  try {
-    /** EP-02 race-condition-handler: re-check Genesis inventory immediately before opening checkout. */
-    if (params.product === 'genesis_80' || params.product === 'genesis_119') {
-      const invFinal = await fetchGenesisInventory();
-      if (isGenesisSoldOut(invFinal, params.product)) {
-        return {
-          ok: false,
-          reason: 'sold_out',
-          message: 'That Genesis slot was just taken. Refresh the page and try again.',
-        };
-      }
-    }
-    pendingOnCheckoutCompleted = params.onCheckoutCompleted;
-    paddle.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      customer: params.email ? { email: params.email } : undefined,
-      customData,
-      settings: { displayMode: 'overlay', theme: 'dark', locale: 'en' },
-    });
-    return { ok: true };
-  } catch (e: unknown) {
-    pendingOnCheckoutCompleted = undefined;
-    const message = e instanceof Error ? e.message : 'Checkout failed to open.';
-    return { ok: false, reason: 'paddle_error', message };
-  }
+export function paddleClientConfigured(): boolean {
+  return polarCheckoutConfigured();
+}
+
+export function priceConfigured(_product: CheckoutProductKey): boolean {
+  return true;
 }

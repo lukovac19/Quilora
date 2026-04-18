@@ -1,5 +1,7 @@
 /** EP-07 Native connector — hub block between two canvas nodes. */
 
+import type { AiEvidenceBundle } from './ai/types/aiEvidenceBundle';
+
 export type ConnectorLinkType = 'relationship' | 'contrast' | 'cause_effect';
 
 /** DB `connectors.link_type` uses `cause_and_effect`. */
@@ -23,6 +25,7 @@ export type ConnectorNodePayload = {
   sourceCitation: string;
   aiLoading?: boolean;
   creditsDebited?: number;
+  aiEvidence?: AiEvidenceBundle | null;
 };
 
 export const CONNECTOR_AI_CREDITS = 2;
@@ -59,6 +62,35 @@ export function parseConnectorPayload(raw: unknown): ConnectorNodePayload | null
   const lt = String(c.linkType ?? 'relationship');
   const linkType: ConnectorLinkType =
     lt === 'contrast' ? 'contrast' : lt === 'cause_effect' || lt === 'cause-and-effect' ? 'cause_effect' : 'relationship';
+  const aiRaw = c.aiEvidence;
+  let aiEvidence: AiEvidenceBundle | null | undefined;
+  if (aiRaw === null) aiEvidence = null;
+  else if (aiRaw && typeof aiRaw === 'object') {
+    const a = aiRaw as Record<string, unknown>;
+    const citRaw = a.citations;
+    const citations = Array.isArray(citRaw)
+      ? (citRaw as Record<string, unknown>[]).map((x) => ({
+          document_id: String(x.document_id ?? ''),
+          source_title: String(x.source_title ?? ''),
+          page_number: Number(x.page_number ?? 0) || 0,
+          chunk_id: String(x.chunk_id ?? ''),
+          quoted_text: String(x.quoted_text ?? ''),
+          start_char: Number(x.start_char ?? 0) || 0,
+          end_char: Number(x.end_char ?? 0) || 0,
+        }))
+      : [];
+    aiEvidence = {
+      grounded: Boolean(a.grounded),
+      confidence: Number(a.confidence ?? 0) || 0,
+      citations,
+      insufficient_evidence: Boolean(a.insufficient_evidence),
+      reason: String(a.reason ?? ''),
+      trust_state:
+        a.trust_state === 'ungrounded' || a.trust_state === 'insufficient' || a.trust_state === 'unanchored' || a.trust_state === 'grounded'
+          ? a.trust_state
+          : 'insufficient',
+    };
+  }
   return {
     endpointFromId: from,
     endpointToId: to,
@@ -68,6 +100,7 @@ export function parseConnectorPayload(raw: unknown): ConnectorNodePayload | null
     sourceCitation: String(c.sourceCitation ?? ''),
     aiLoading: Boolean(c.aiLoading),
     creditsDebited: c.creditsDebited != null ? Number(c.creditsDebited) : undefined,
+    aiEvidence,
   };
 }
 

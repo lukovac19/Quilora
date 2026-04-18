@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { computeBillingGatePassed } from '../lib/billingGate';
+import { subscriptionRowGrantsPaidSeat } from '../lib/billing/effectiveBillingState';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson } from '../lib/quiloraEdge';
 import { registerPostCheckoutWebhookDelayWatch } from '../lib/postCheckoutWebhookDelayWatch';
 
@@ -34,7 +35,7 @@ export interface User {
   emailProductTips?: boolean;
   /** Study reminder emails (auth user_metadata). */
   emailStudyReminders?: boolean;
-  /** EP-02: false until Bookworm plan is confirmed on /pricing or Paddle subscription is active / paid tier. */
+  /** EP-02: false until Bookworm plan is confirmed on /pricing or paid subscription is active / paid tier. */
   billingGatePassed: boolean;
 }
 
@@ -146,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null;
     }
     const u = session.user;
-    const [{ data: profile }, subCountRes] = await Promise.all([
+    const [{ data: profile }, { data: subRows }] = await Promise.all([
       supabase
         .from('profiles')
         .select(
@@ -156,11 +157,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .maybeSingle(),
       supabase
         .from('subscriptions')
-        .select('*', { count: 'exact', head: true })
+        .select('status, cancel_at_period_end, current_period_end, is_lifetime, internal_plan_key, billing_provider')
         .eq('user_id', u.id)
-        .eq('status', 'active'),
+        .order('updated_at', { ascending: false })
+        .limit(1),
     ]);
-    const activeSubCount = subCountRes.count;
+    const sub = subRows?.[0] ?? null;
     const meta = u.user_metadata as {
       name?: string;
       email_product_tips?: boolean;
@@ -176,11 +178,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       rawTier === 'bibliophile' || rawTier === 'genesis' ? rawTier : 'bookworm';
     const emailConfirmed = Boolean(u.email_confirmed_at);
     const planSelectionCompleted = Boolean((profile as { plan_selection_completed?: boolean } | null)?.plan_selection_completed);
-    const hasActivePaddleSubscription = (activeSubCount ?? 0) > 0;
+    const hasActivePaidSubscription = sub
+      ? subscriptionRowGrantsPaidSeat({
+          status: sub.status as string,
+          cancel_at_period_end: sub.cancel_at_period_end as boolean | null,
+          current_period_end: sub.current_period_end as string | null,
+          is_lifetime: sub.is_lifetime as boolean | null,
+        })
+      : false;
     const billingGatePassed = computeBillingGatePassed({
       profileTier,
       planSelectionCompleted,
-      hasActivePaddleSubscription,
+      hasActivePaidSubscription,
     });
     const userObj: User = {
       id: u.id,

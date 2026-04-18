@@ -1,5 +1,7 @@
 /** EP-08 Freestyle node — open-ended chat; standalone vs connected to Source. */
 
+import type { AiEvidenceBundle } from './ai/types/aiEvidenceBundle';
+
 export type FreestyleMode = 'standalone' | 'connected';
 
 export type FreestyleUserMessage = {
@@ -15,6 +17,7 @@ export type FreestyleAssistantMessage = {
   role: 'assistant';
   content: string;
   pending?: boolean;
+  aiEvidence?: AiEvidenceBundle | null;
 };
 
 export type FreestyleThreadMessage = FreestyleUserMessage | FreestyleAssistantMessage;
@@ -66,11 +69,41 @@ export function parseFreestylePayload(raw: unknown): FreestyleNodePayload | null
         includedInContext: m.includedInContext !== false,
       });
     } else if (role === 'assistant') {
+      const aiRaw = m.aiEvidence;
+      let aiEvidence: AiEvidenceBundle | null | undefined;
+      if (aiRaw === null) aiEvidence = null;
+      else if (aiRaw && typeof aiRaw === 'object') {
+        const a = aiRaw as Record<string, unknown>;
+        const citRaw = a.citations;
+        const citations = Array.isArray(citRaw)
+          ? (citRaw as Record<string, unknown>[]).map((x) => ({
+              document_id: String(x.document_id ?? ''),
+              source_title: String(x.source_title ?? ''),
+              page_number: Number(x.page_number ?? 0) || 0,
+              chunk_id: String(x.chunk_id ?? ''),
+              quoted_text: String(x.quoted_text ?? ''),
+              start_char: Number(x.start_char ?? 0) || 0,
+              end_char: Number(x.end_char ?? 0) || 0,
+            }))
+          : [];
+        aiEvidence = {
+          grounded: Boolean(a.grounded),
+          confidence: Number(a.confidence ?? 0) || 0,
+          citations,
+          insufficient_evidence: Boolean(a.insufficient_evidence),
+          reason: String(a.reason ?? ''),
+          trust_state:
+            a.trust_state === 'ungrounded' || a.trust_state === 'insufficient' || a.trust_state === 'unanchored' || a.trust_state === 'grounded'
+              ? a.trust_state
+              : 'insufficient',
+        };
+      }
       messages.push({
         id,
         role: 'assistant',
         content: String(m.content ?? ''),
         pending: Boolean(m.pending),
+        aiEvidence,
       });
     }
   }

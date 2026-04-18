@@ -8,7 +8,7 @@ type PaddleWebhookPayload = {
   data?: Record<string, unknown>;
 };
 
-type GenesisTier = 'genesis_80' | 'genesis_119';
+export type GenesisTier = 'genesis_80' | 'genesis_119';
 
 function pricePointFromTier(tier: GenesisTier): '80' | '119' {
   return tier === 'genesis_80' ? '80' : '119';

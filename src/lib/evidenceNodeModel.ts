@@ -1,5 +1,7 @@
 /** EP-06 Evidence node — payloads, search, frequency (grounded in Source). */
 
+import type { AiEvidenceBundle } from './ai/types/aiEvidenceBundle';
+
 export type EvidenceSubtype = 'anchor' | 'micro_search' | 'frequency';
 
 export const EVIDENCE_ANCHOR_CREDITS = 2;
@@ -39,6 +41,8 @@ export type EvidenceNodePayload = {
   frequencyPhrase?: string;
   frequencyByChapter?: EvidenceFrequencyPoint[];
   maxFrequency?: number;
+  /** Structured RAG output for evidence anchor */
+  anchorAiEvidence?: AiEvidenceBundle | null;
 };
 
 export function initialEvidencePayload(
@@ -162,6 +166,35 @@ export function parseEvidencePayload(raw: unknown): EvidenceNodePayload | null {
         count: Number(r.count ?? 0),
       }))
     : undefined;
+  const aiRaw = e.anchorAiEvidence;
+  let anchorAiEvidence: AiEvidenceBundle | null | undefined;
+  if (aiRaw === null) anchorAiEvidence = null;
+  else if (aiRaw && typeof aiRaw === 'object') {
+    const a = aiRaw as Record<string, unknown>;
+    const citRaw = a.citations;
+    const citations = Array.isArray(citRaw)
+      ? (citRaw as Record<string, unknown>[]).map((x) => ({
+          document_id: String(x.document_id ?? ''),
+          source_title: String(x.source_title ?? ''),
+          page_number: Number(x.page_number ?? 0) || 0,
+          chunk_id: String(x.chunk_id ?? ''),
+          quoted_text: String(x.quoted_text ?? ''),
+          start_char: Number(x.start_char ?? 0) || 0,
+          end_char: Number(x.end_char ?? 0) || 0,
+        }))
+      : [];
+    anchorAiEvidence = {
+      grounded: Boolean(a.grounded),
+      confidence: Number(a.confidence ?? 0) || 0,
+      citations,
+      insufficient_evidence: Boolean(a.insufficient_evidence),
+      reason: String(a.reason ?? ''),
+      trust_state:
+        a.trust_state === 'ungrounded' || a.trust_state === 'insufficient' || a.trust_state === 'unanchored' || a.trust_state === 'grounded'
+          ? a.trust_state
+          : 'insufficient',
+    };
+  }
   return {
     subtype,
     linkedSourceNodeId: linked,
@@ -178,5 +211,6 @@ export function parseEvidencePayload(raw: unknown): EvidenceNodePayload | null {
     frequencyPhrase: e.frequencyPhrase != null ? String(e.frequencyPhrase) : undefined,
     frequencyByChapter,
     maxFrequency: e.maxFrequency != null ? Number(e.maxFrequency) : undefined,
+    anchorAiEvidence,
   };
 }

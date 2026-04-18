@@ -9,7 +9,7 @@ function tierLabel(user: User): string {
   return 'Bookworm';
 }
 
-/** Block duplicate or conflicting pre-launch purchases before opening Paddle (flow v4 — duplicate purchase guard). */
+/** Block duplicate or conflicting pre-launch purchases before opening checkout (flow v4 — duplicate purchase guard). */
 export function assertPrelaunchCheckoutAllowed(
   user: User,
   intent: PrelaunchCheckoutIntent,

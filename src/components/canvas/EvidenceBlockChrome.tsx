@@ -4,6 +4,9 @@ import type { CanvasNode } from '../../lib/canvasNodeModel';
 import { NODE_LABELS } from '../../lib/canvasNodeModel';
 import type { EvidenceNodePayload } from '../../lib/evidenceNodeModel';
 import { EVIDENCE_MICRO_SEARCH_CREDITS, frequencyByChapter, microDetailSearchInCorpus } from '../../lib/evidenceNodeModel';
+import { CitationList } from '../citations/CitationList';
+import { TrustBadge } from '../citations/TrustBadge';
+import type { GroundedCitation } from '../../lib/ai/types/groundedAnswer';
 
 const SUBTYPE_LABELS: Record<EvidenceNodePayload['subtype'], string> = {
   anchor: 'Evidence anchor',
@@ -27,6 +30,7 @@ export function EvidenceBlockChrome({
   onToggleFavorite,
   onFocusSourceNode,
   onMicroSearchPaid,
+  onCitationOpen,
 }: {
   node: CanvasNode;
   payload: EvidenceNodePayload;
@@ -44,6 +48,7 @@ export function EvidenceBlockChrome({
   onFocusSourceNode: (sourceNodeId: string) => void;
   /** Return true when 2 cr deducted and search may run */
   onMicroSearchPaid: (nodeId: string, query: string) => Promise<boolean>;
+  onCitationOpen?: (c: GroundedCitation) => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showConnectHandle, setShowConnectHandle] = useState(false);
@@ -114,11 +119,16 @@ export function EvidenceBlockChrome({
   const pts = payload.frequencyByChapter ?? [];
   const maxF = Math.max(1, payload.maxFrequency ?? 1);
 
+  const anchorWarn =
+    payload.subtype === 'anchor' && payload.anchorAiEvidence?.trust_state === 'insufficient' && !sourceMissing;
+
   return (
     <div
       ref={frameRef}
       data-evidence-block
-      className="relative flex h-full min-h-0 flex-col rounded-[1.35rem] border-2 border-[#7b68ee] bg-gradient-to-br from-[#f5f3ff] to-[#ebe4ff] shadow-[0_18px_50px_rgba(123,104,238,0.18)]"
+      className={`relative flex h-full min-h-0 flex-col rounded-[1.35rem] border-2 bg-gradient-to-br from-[#f5f3ff] to-[#ebe4ff] shadow-[0_18px_50px_rgba(123,104,238,0.18)] ${
+        anchorWarn ? 'border-amber-500 ring-2 ring-amber-400/50 ring-offset-1 ring-offset-[#f5f3ff] animate-pulse' : 'border-[#7b68ee]'
+      }`}
       onContextMenu={(e) => {
         e.preventDefault();
         setMenuOpen(true);
@@ -235,6 +245,15 @@ export function EvidenceBlockChrome({
               >
                 {payload.trustFactorLabel ?? 'High'}
               </span>
+              {payload.anchorAiEvidence ? (
+                <div className="mt-2 space-y-2 rounded-lg border border-[#0f172a]/10 bg-white/70 px-2 py-2">
+                  <TrustBadge state={payload.anchorAiEvidence.trust_state} />
+                  {payload.anchorAiEvidence.insufficient_evidence && payload.anchorAiEvidence.reason ? (
+                    <p className="text-[10px] text-amber-950/90">{payload.anchorAiEvidence.reason}</p>
+                  ) : null}
+                  <CitationList citations={payload.anchorAiEvidence.citations} compact onOpenSource={onCitationOpen} />
+                </div>
+              ) : null}
               <p data-2-credit-deduction-label className="text-[10px] text-[#64748b]">
                 2 credits charged for this anchor
               </p>
