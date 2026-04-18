@@ -147,6 +147,10 @@ export const router = createBrowserRouter([
         path: "payments",
         Component: PaymentTermsPage,
       },
+      {
+        path: "payment-terms",
+        Component: PaymentTermsPage,
+      },
       { 
         path: "dashboard-frame-2", 
         Component: DashboardFrame2 
