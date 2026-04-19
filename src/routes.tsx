@@ -71,7 +71,7 @@ export const router = createBrowserRouter([
     Component: RootLayout,
     errorElement: <RouteErrorFallback />,
     children: [
-      { index: true, Component: QuiloraLandingPage },
+      { index: true, Component: PreLaunchPage },
       {
         path: "early-access/genesis-welcome",
         element: <Navigate to="/early-access" replace />,

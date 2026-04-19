@@ -70,6 +70,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "create-test-user": "node scripts/create-test-user.mjs",
     "test-user": "node scripts/create-test-user.mjs"
   }
 }

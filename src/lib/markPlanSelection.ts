@@ -7,10 +7,17 @@ export async function markBookwormPlanSelectedForCurrentUser(): Promise<{ ok: bo
     error: authErr,
   } = await supabase.auth.getUser();
   if (authErr || !user) return { ok: false, message: 'Not signed in' };
-  const { error } = await supabase
+  const ts = new Date().toISOString();
+  const primary = await supabase
     .from('profiles')
-    .update({ plan_selection_completed: true, updated_at: new Date().toISOString() })
+    .update({ plan_selection_completed: true, updated_at: ts })
     .eq('id', user.id);
-  if (error) return { ok: false, message: error.message };
+  if (!primary.error) return { ok: true };
+
+  const legacy = await supabase
+    .from('profiles')
+    .update({ plan_selection: 'bookworm', updated_at: ts })
+    .eq('id', user.id);
+  if (legacy.error) return { ok: false, message: legacy.error.message };
   return { ok: true };
 }

@@ -13,6 +13,8 @@ const GENESIS_CHOICE_REDIRECT_PATH = '/early-access/genesis-choice';
 
 /** Prevents “Please wait…” forever if the Auth API never returns (network / stalled request). */
 const AUTH_REQUEST_TIMEOUT_MS = 45000;
+/** Profile hydration after sign-in can race SIGNED_IN; bound wait then fall back to session-only user. */
+const PROFILE_REFRESH_TIMEOUT_MS = 25000;
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
@@ -256,9 +258,13 @@ export function AuthPage() {
     let cancelled = false;
 
     const init = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 15000, 'getSession');
+        session = data.session;
+      } catch {
+        return;
+      }
       if (cancelled) return;
       if (!session?.user) {
         setExistingSessionEmail(null);
@@ -282,11 +288,20 @@ export function AuthPage() {
       }
 
       setExistingSessionEmail(null);
-      const hydrated = await refreshAuthUser();
+      let hydrated: User | null = null;
+      try {
+        hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+      } catch {
+        hydrated = null;
+      }
       if (cancelled) return;
-      if (!hydrated) return;
+      const navUser = hydrated ?? mapSessionToUser(session.user);
+      if (!hydrated) {
+        setUser(mapSessionToUser(session.user));
+        void refreshAuthUser();
+      }
       const redirect = safeInternalPath(new URLSearchParams(window.location.search).get('redirect'));
-      if (hydrated.emailConfirmed && !hydrated.billingGatePassed) {
+      if (navUser.emailConfirmed && !navUser.billingGatePassed) {
         if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
           markGenesisChoiceFlowPending();
           navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
@@ -316,11 +331,20 @@ export function AuthPage() {
           return;
         }
         void (async () => {
-          const hydrated = await refreshAuthUser();
-          if (!hydrated) return;
+          let hydrated: User | null = null;
+          try {
+            hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+          } catch {
+            hydrated = null;
+          }
+          const navUser = hydrated ?? mapSessionToUser(session.user);
+          if (!hydrated) {
+            setUser(mapSessionToUser(session.user));
+            void refreshAuthUser();
+          }
           setExistingSessionEmail(null);
           const redirect = safeInternalPath(new URLSearchParams(window.location.search).get('redirect'));
-          if (!hydrated.billingGatePassed) {
+          if (!navUser.billingGatePassed) {
             if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
               markGenesisChoiceFlowPending();
               navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
@@ -441,14 +465,20 @@ export function AuthPage() {
             setLoading(false);
             return;
           }
-          const hydrated = await refreshAuthUser();
-          if (!hydrated) {
-            setLoading(false);
-            return;
+          let hydrated: User | null = null;
+          try {
+            hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+          } catch {
+            hydrated = null;
           }
-          showToast('Welcome to Quilora!', 'success');
+          if (!hydrated) {
+            setUser(mapSessionToUser(u));
+            void refreshAuthUser();
+          }
+          const navUser = hydrated ?? mapSessionToUser(u);
+          showToast(hydrated ? 'Welcome to Quilora!' : 'Welcome — loading your profile…', hydrated ? 'success' : 'info');
           const redirect = safeInternalPath(searchParams.get('redirect'));
-          if (!hydrated.billingGatePassed) {
+          if (!navUser.billingGatePassed) {
             if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
               markGenesisChoiceFlowPending();
               navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
@@ -495,14 +525,20 @@ export function AuthPage() {
             setLoading(false);
             return;
           }
-          const hydrated = await refreshAuthUser();
-          if (!hydrated) {
-            setLoading(false);
-            return;
+          let hydrated: User | null = null;
+          try {
+            hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+          } catch {
+            hydrated = null;
           }
-          showToast('Logged in successfully!', 'success');
+          if (!hydrated) {
+            setUser(mapSessionToUser(data.user));
+            void refreshAuthUser();
+          }
+          const navUser = hydrated ?? mapSessionToUser(data.user);
+          showToast(hydrated ? 'Logged in successfully!' : 'Logged in — finishing setup…', hydrated ? 'success' : 'info');
           const redirect = safeInternalPath(searchParams.get('redirect'));
-          if (!hydrated.billingGatePassed) {
+          if (!navUser.billingGatePassed) {
             if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
               markGenesisChoiceFlowPending();
               navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });

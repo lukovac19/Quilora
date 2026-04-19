@@ -1,9 +1,11 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { computeBillingGatePassed } from '../lib/billingGate';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson } from '../lib/quiloraEdge';
 import { registerPostCheckoutWebhookDelayWatch } from '../lib/postCheckoutWebhookDelayWatch';
 import { withTimeout } from '../lib/promiseTimeout';
+import { tryDevAutoLogin } from '../lib/devAutoLogin';
+import { normalizeProfileRow, paidFromUserPlansRow, type NormalizedProfile } from '../lib/profileRowCompat';
 
 type Language = 'en' | 'bs' | 'es';
 type Theme = 'dark' | 'light';
@@ -122,6 +124,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [sessions, setSessions] = useState<StudySession[]>([]);
 
+  /** One hydration at a time — avoids duplicate work / stuck awaits when SIGNED_IN races with manual login. */
+  const hydrateInFlightRef = useRef<Promise<User | null> | null>(null);
+
   const refreshLaunchState = useCallback(async () => {
     try {
       const data = await quiloraEdgeGetJson<{ publicLaunchComplete?: boolean }>(
@@ -138,6 +143,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshLaunchState]);
 
   const hydrateFromSession = useCallback(async (): Promise<User | null> => {
+    if (hydrateInFlightRef.current) {
+      return hydrateInFlightRef.current;
+    }
+    const run = (async (): Promise<User | null> => {
     try {
       let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
       try {
@@ -160,31 +169,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const u = session.user;
 
-      type ProfileRow = {
-        full_name?: string | null;
-        email?: string | null;
-        tier?: string | null;
-        credit_balance?: number | null;
-        streak_count?: number | null;
-        streak_goal?: number | null;
-        avatar_url?: string | null;
-        genesis_badge?: boolean | null;
-        plan_selection_completed?: boolean | null;
-      } | null;
-
-      let profile: ProfileRow = null;
+      let profile: NormalizedProfile | null = null;
       let activeSubCount = 0;
 
       try {
         const [profileRes, subRes] = await withTimeout(
           Promise.all([
-            supabase
-              .from('profiles')
-              .select(
-                'full_name, email, tier, credit_balance, streak_count, streak_goal, avatar_url, genesis_badge, plan_selection_completed',
-              )
-              .eq('id', u.id)
-              .maybeSingle(),
+            supabase.from('profiles').select('*').eq('id', u.id).maybeSingle(),
             supabase
               .from('subscriptions')
               .select('*', { count: 'exact', head: true })
@@ -197,12 +188,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (profileRes.error) {
           console.error('[auth] profiles select', profileRes.error);
         } else {
-          profile = profileRes.data as ProfileRow;
+          profile = normalizeProfileRow(profileRes.data as Record<string, unknown> | null);
         }
-        if (subRes.error) {
-          console.error('[auth] subscriptions count', subRes.error);
-        } else {
+        if (!subRes.error) {
           activeSubCount = subRes.count ?? 0;
+        } else {
+          console.warn('[auth] subscriptions table unavailable, trying user_plans:', subRes.error.message);
+          const upRes = await supabase
+            .from('user_plans')
+            .select('plan, subscription_status, is_lifetime')
+            .eq('user_id', u.id)
+            .maybeSingle();
+          if (upRes.error) {
+            console.warn('[auth] user_plans:', upRes.error.message);
+          } else if (upRes.data && paidFromUserPlansRow(upRes.data)) {
+            activeSubCount = 1;
+          }
         }
       } catch (e) {
         console.error('[auth] profile/subscription load', e);
@@ -237,11 +238,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         questionsAsked: 0,
         lastQuestionTime: null,
         cooldownUntil: null,
-        creditBalance: Number(profile?.credit_balance ?? 0),
-        streakCount: Number(profile?.streak_count ?? 0),
-        streakGoal: Number(profile?.streak_goal ?? 1),
+        creditBalance: profile?.credit_balance ?? 0,
+        streakCount: profile?.streak_count ?? 0,
+        streakGoal: profile?.streak_goal ?? 1,
         emailConfirmed,
-        avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
+        avatarUrl: profile?.avatar_url ?? null,
         profileTier,
         genesisBadge: Boolean(profile?.genesis_badge),
         emailProductTips: meta?.email_product_tips !== false,
@@ -256,7 +257,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null;
     } finally {
       setAuthLoading(false);
+      hydrateInFlightRef.current = null;
     }
+    })();
+    hydrateInFlightRef.current = run;
+    return run;
   }, []);
 
   const refreshAuthUser = useCallback(async () => {
@@ -268,13 +273,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshAuthUser]);
 
   useEffect(() => {
-    void hydrateFromSession();
+    let cancelled = false;
+    void (async () => {
+      await tryDevAutoLogin();
+      if (cancelled) return;
+      await hydrateFromSession();
+    })();
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
       void hydrateFromSession();
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [hydrateFromSession]);
 
   useEffect(() => {

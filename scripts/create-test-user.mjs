@@ -70,3 +70,8 @@ console.log('Password:', password);
 if (!json?.session) {
   console.log('\n(No session returned — email confirmation may be required.)');
 }
+console.log('\n--- Optional: auto sign-in during `npm run dev` ---');
+console.log('Add to .env.local (restart Vite):');
+console.log(`VITE_DEV_AUTO_LOGIN=true`);
+console.log(`VITE_DEV_TEST_EMAIL=${JSON.stringify(email)}`);
+console.log(`VITE_DEV_TEST_PASSWORD=${JSON.stringify(password)}`);
