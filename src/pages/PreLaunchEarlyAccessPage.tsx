@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import type { InternalPlanKey } from '../lib/billing/types';
+import type { CheckoutProductKey } from '../lib/billingCheckout';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
@@ -9,7 +9,7 @@ export function PreLaunchEarlyAccessPage() {
   const navigate = useNavigate();
 
   const onCheckoutCompleted = useCallback(
-    (_product: InternalPlanKey) => {
+    (_product: CheckoutProductKey) => {
       navigate('/onboarding');
     },
     [navigate],
@@ -17,7 +17,7 @@ export function PreLaunchEarlyAccessPage() {
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden" style={{ backgroundColor: '#0a1929', fontFamily: 'Inter, sans-serif' }}>
-      <QuiloraMarketingNavBar preLaunchScreen1Nav />
+      <QuiloraMarketingNavBar logoOnly />
 
       <main className="flex-1 px-4 pb-16 pt-40 sm:px-6 sm:pb-20 sm:pt-44 md:pt-48 lg:pt-52">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-14 md:gap-20 lg:gap-24">

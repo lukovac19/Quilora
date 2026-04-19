@@ -7,8 +7,7 @@ import { useApp } from '../context/AppContext';
 import {
   fetchGenesisInventory,
   isGenesisSoldOut,
-  openPlanCheckout,
-  POLAR_POST_GENESIS_PLAN_KEY,
+  openDodoCheckout,
   type GenesisInventory,
 } from '../lib/billingCheckout';
 import {
@@ -18,7 +17,6 @@ import {
 } from '../lib/genesisEarlyAccessSession';
 
 const GENESIS_BUNDLE_CHOICE = 'quiloraGenesisBundleChoice';
-const PENDING_GENESIS_BUNDLE_SS = 'quilora_pending_genesis_bundle';
 
 /** Screen 3 — Lifetime Deal options before checkout. Not onboarding. */
 export function GenesisChoicePage() {
@@ -92,30 +90,26 @@ export function GenesisChoicePage() {
       return;
     }
     const inv = await fetchGenesisInventory();
-    let slot: '80' | '119' = '80';
-    if (inv && isGenesisSoldOut(inv, 'genesis_80')) slot = '119';
-    if (inv && isGenesisSoldOut(inv, slot === '80' ? 'genesis_80' : 'genesis_119')) {
+    let product: 'lifetime_early_bird' | 'lifetime_standard' = 'lifetime_early_bird';
+    if (inv && isGenesisSoldOut(inv, 'lifetime_early_bird')) product = 'lifetime_standard';
+    if (inv && isGenesisSoldOut(inv, product)) {
       navigate('/early-access', { replace: true });
       return;
     }
-    try {
-      sessionStorage.setItem(PENDING_GENESIS_BUNDLE_SS, 'ltd_only');
-    } catch {
-      /* ignore */
-    }
-    const res = await openPlanCheckout({
-      planKey: 'genesis_lifetime',
+    const res = await openDodoCheckout({
+      product,
       userId: user.id,
       email: user.email,
-      genesisSlotPricePoint: slot,
-      afterSuccessNavigate: '/onboarding',
+      onCheckoutCompleted: () => {
+        try {
+          localStorage.setItem(GENESIS_BUNDLE_CHOICE, 'ltd_only');
+        } catch {
+          /* ignore */
+        }
+        finishPostPurchaseOnboarding();
+      },
     });
     if (!res.ok) {
-      try {
-        sessionStorage.removeItem(PENDING_GENESIS_BUNDLE_SS);
-      } catch {
-        /* ignore */
-      }
       if (res.reason === 'sold_out') navigate('/early-access', { replace: true });
       else toast.error(res.message);
     }
@@ -140,35 +134,37 @@ export function GenesisChoicePage() {
       return;
     }
     const inv = await fetchGenesisInventory();
-    let slot: '80' | '119' = '80';
-    if (inv && isGenesisSoldOut(inv, 'genesis_80')) slot = '119';
-    if (inv && isGenesisSoldOut(inv, slot === '80' ? 'genesis_80' : 'genesis_119')) {
+    let product: 'lifetime_early_bird' | 'lifetime_standard' = 'lifetime_early_bird';
+    if (inv && isGenesisSoldOut(inv, 'lifetime_early_bird')) product = 'lifetime_standard';
+    if (inv && isGenesisSoldOut(inv, product)) {
       navigate('/early-access', { replace: true });
       return;
     }
-    try {
-      sessionStorage.setItem(POLAR_POST_GENESIS_PLAN_KEY, 'sage_yearly');
-      sessionStorage.setItem(PENDING_GENESIS_BUNDLE_SS, 'ltd_sage_year');
-    } catch {
-      /* ignore */
-    }
-    const res = await openPlanCheckout({
-      planKey: 'genesis_lifetime',
+    const res = await openDodoCheckout({
+      product,
       userId: user.id,
       email: user.email,
-      genesisSlotPricePoint: slot,
-      afterSuccessNavigate: '/onboarding',
+      onCheckoutCompleted: () => {
+        void openDodoCheckout({
+          product: 'sage_yearly',
+          userId: user.id,
+          email: user.email,
+          onCheckoutCompleted: () => {
+            try {
+              localStorage.setItem(GENESIS_BUNDLE_CHOICE, 'ltd_sage_year');
+            } catch {
+              /* ignore */
+            }
+            finishPostPurchaseOnboarding();
+          },
+        }).then((res2) => {
+          if (!res2.ok) toast.error(res2.message);
+        });
+      },
     });
     if (!res.ok) {
-      try {
-        sessionStorage.removeItem(POLAR_POST_GENESIS_PLAN_KEY);
-        sessionStorage.removeItem(PENDING_GENESIS_BUNDLE_SS);
-      } catch {
-        /* ignore */
-      }
       if (res.reason === 'sold_out') navigate('/early-access', { replace: true });
       else toast.error(res.message);
-      return;
     }
   }, [user, navigate, finishPostPurchaseOnboarding, blockCheckoutForTierChange]);
 
@@ -194,7 +190,7 @@ export function GenesisChoicePage() {
             <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-white/55 md:text-lg">
               Shown before checkout during pre-launch only.
             </p>
-            {genesisInv && !isGenesisSoldOut(genesisInv, 'genesis_80') ? (
+            {genesisInv && !isGenesisSoldOut(genesisInv, 'lifetime_early_bird') ? (
               <p className="mx-auto mt-4 max-w-xl rounded-2xl border border-[#266ba7]/30 bg-[#266ba7]/10 px-4 py-3 text-sm font-medium text-[#7bbdf3]">
                 You&apos;re getting the $80 rate (first 50 seats).
               </p>

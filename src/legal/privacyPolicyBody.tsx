@@ -25,7 +25,7 @@ export function PrivacyPolicyBody() {
           <strong>2.1 Account and Identity Data</strong> — Email address (required for registration and account management); display name (optional, user-defined); account tier and subscription status; Genesis Account status and badge (where applicable).
         </LegalParagraph>
         <LegalParagraph>
-          <strong>2.2 Payment and Billing Data</strong> — Payment transactions are processed exclusively by Polar, our Merchant of Record. Quilora does not store, access, or process your full payment card details. We receive from Polar only: order confirmation, subscription status, tier assignment, and transaction ID for credit allocation purposes.
+          <strong>2.2 Payment and Billing Data</strong> — Payment transactions are processed exclusively by Dodo Payments, our Merchant of Record. Quilora does not store, access, or process your full payment card details. We receive from Dodo Payments only: order confirmation, subscription status, tier assignment, and transaction ID for credit allocation purposes.
         </LegalParagraph>
         <LegalParagraph>
           <strong>2.3 User-Uploaded Content</strong> — When you upload documents (PDF, EPUB), paste text, or activate CC Library titles, Quilora processes and stores: the full text of uploaded documents, chunked into passages of approximately 500–800 tokens each for AI processing; vector embeddings of each chunk, stored in our pgvector database (Supabase), used to retrieve relevant passages when AI features are activated; document metadata: filename, upload date, file type, and chapter structure. Your uploaded content is processed solely to provide the Services to you. We do not use your content to train AI models, and we do not make your content available to other users.
@@ -60,7 +60,7 @@ export function PrivacyPolicyBody() {
         <LegalParagraph>We use the data we collect for the following purposes:</LegalParagraph>
         <LegalBulletList>
           <li>Account and authentication management via Supabase Auth;</li>
-          <li>Processing payments and allocating subscription credits via Polar webhooks;</li>
+          <li>Processing payments and allocating subscription credits via Dodo Payments webhooks;</li>
           <li>
             Chunking, embedding, and retrieving your uploaded content via pgvector (Supabase) to power AI features including analytical lenses, evidence anchors, reading feedback, and inline chat prompts;
           </li>
@@ -93,8 +93,8 @@ export function PrivacyPolicyBody() {
 
       <LegalSectionCard id="section-6" title="6. Data Sharing and Third Parties">
         <LegalParagraph>
-          <strong>6.1 Polar (Payment Processor and Merchant of Record)</strong> — Polar processes all payment transactions. Your billing data is collected and stored by Polar under their own Privacy Policy (available at{' '}
-          <a href="https://polar.sh/legal/privacy">polar.sh/legal/privacy</a>). Polar provides Quilora with subscription status, tier assignments, and order confirmations only.
+          <strong>6.1 Dodo Payments (Payment Processor and Merchant of Record)</strong> — Dodo Payments processes all payment transactions. Your billing data is collected and stored by Dodo Payments under their own Privacy Policy (available at{' '}
+          <a href="https://dodopayments.com">dodopayments.com</a>). Dodo Payments provides Quilora with subscription status, tier assignments, and order confirmations only.
         </LegalParagraph>
         <LegalParagraph>
           <strong>6.2 Supabase (Database and Authentication Infrastructure)</strong> — Supabase serves as our primary infrastructure provider for: database storage (user accounts, canvas data, block content), authentication and session management (Supabase Auth), and vector embedding storage (pgvector). Supabase processes data under a Data Processing Agreement consistent with GDPR requirements.

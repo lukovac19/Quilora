@@ -1,50 +1,42 @@
-  import { Hono } from 'npm:hono';
-  import { cors } from 'npm:hono/cors';
-  import { logger } from 'npm:hono/logger';
-  import { createClient } from 'jsr:@supabase/supabase-js@2';
-  import * as kv from './kv_store.tsx';
-  import { CREDIT_RULES, TIER_LIMITS, type QuiloraTier } from './billing_config.ts';
-  import {
-    applyBibliophileMonthlyRenewal,
-    applyBookwormMonthlyRenewal,
-    applyBookwormSandboxReadonly,
-    chargeCredits,
-    ensureBillingState,
-    getLowBalanceStatus,
-    getProfile,
-    getTierEntitlements,
-    grantCredits,
-    markPrelaunchPurchaseProfile,
-    setPlanSelectionCompleted,
-    setTier,
-  } from './credit_service.ts';
-  import { getGenesisInventory } from './genesis_inventory_service.ts';
-  import {
-    adminLinkOrphanPayment,
-    cancelGenesisReleaseSeat,
-    cancelPrelaunchBookwormSage,
-    createCheckoutPassthrough,
-    enqueueEmail,
-    getPublicLaunchComplete,
-    processEmailOutboxBatch,
-    reconcileOrphanPayments,
-    reportWebhookDelayForUser,
-    runNinetyDayRefundCheck,
-    setPublicLaunchComplete,
-  } from './prelaunch_v4_service.ts';
-  import {
-    buildPolarBillingMe,
-    createPolarCheckoutSession,
-    createPolarCustomerPortalSession,
-    fulfillFromCheckoutApi,
-    markPolarEventError,
-    markPolarEventStart,
-    processPolarWebhookEnvelope,
-    verifyPolarWebhook,
-  } from './polar_billing.ts';
-  import { isPolarPlanKey } from './polar_plan.ts';
+import { Hono } from 'npm:hono';
+import { cors } from 'npm:hono/cors';
+import { logger } from 'npm:hono/logger';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+import * as kv from './kv_store.tsx';
+import { CREDIT_RULES, TIER_LIMITS, type QuiloraTier } from './billing_config.ts';
+import {
+  applyBibliophileMonthlyRenewal,
+  applyBookwormMonthlyRenewal,
+  applyBookwormSandboxReadonly,
+  chargeCredits,
+  ensureBillingState,
+  getLowBalanceStatus,
+  getProfile,
+  getTierEntitlements,
+  grantCredits,
+  markPrelaunchPurchaseProfile,
+  setPlanSelectionCompleted,
+  setTier,
+} from './credit_service.ts';
+import { getGenesisInventory } from './billing_genesis_service.ts';
+import { dodoCreateCheckoutSession, dodoCreateCustomerPortalSession } from './dodo_billing_api.ts';
+import { hasProcessedDodoWebhook, markDodoWebhookProcessed, processDodoWebhookPayload, verifyDodoWebhook } from './dodo_webhook.ts';
+import {
+  adminLinkOrphanPayment,
+  assertPrelaunchWebhookPurchaseAllowed,
+  cancelGenesisReleaseSeat,
+  cancelPrelaunchBookwormSage,
+  createCheckoutPassthrough,
+  enqueueEmail,
+  getPublicLaunchComplete,
+  processEmailOutboxBatch,
+  reconcileOrphanPayments,
+  reportWebhookDelayForUser,
+  runNinetyDayRefundCheck,
+  setPublicLaunchComplete,
+} from './prelaunch_v4_service.ts';
 
-  const app = new Hono();
+const app = new Hono();
 
 type ChatTurn = { role: string; content: string };
 
@@ -760,6 +752,29 @@ app.get('/make-server-5a3d4811/billing/genesis-inventory', async (c) => {
   }
 });
 
+app.get('/make-server-5a3d4811/billing/dodo/checkout-eligibility', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const productKind = String(c.req.query('productKind') ?? '').trim();
+    if (!productKind) return c.json({ error: 'Missing productKind' }, 400);
+    const dup = await assertPrelaunchWebhookPurchaseAllowed(supabase, userId, productKind);
+    const { data: userPlan } = await supabase
+      .from('user_plans')
+      .select('plan, subscription_status, is_lifetime, subscription_period_end')
+      .eq('user_id', userId)
+      .maybeSingle();
+    return c.json({
+      ok: dup.ok,
+      error: dup.ok ? null : dup.error,
+      userPlan: userPlan ?? null,
+    });
+  } catch (error) {
+    console.error('checkout-eligibility', error);
+    return c.json({ error: 'eligibility_failed' }, 500);
+  }
+});
+
 app.get('/make-server-5a3d4811/billing/app-state', async (c) => {
   try {
     const publicLaunchComplete = await getPublicLaunchComplete(supabase);
@@ -811,114 +826,6 @@ app.post('/make-server-5a3d4811/billing/cancel-genesis', async (c) => {
   }
 });
 
-app.post('/make-server-5a3d4811/billing/create-checkout-session', async (c) => {
-  try {
-    const userId = await verifyAuth(c.req.header('Authorization'));
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
-    const body = (await c.req.json()) as {
-      planKey?: string;
-      userId?: string;
-      userEmail?: string;
-      successUrl?: string;
-      returnUrl?: string | null;
-      genesisSlotPricePoint?: '80' | '119' | null;
-    };
-    if (!body.planKey || !isPolarPlanKey(body.planKey)) return c.json({ error: 'Invalid planKey' }, 400);
-    if (body.userId !== userId) return c.json({ error: 'Forbidden' }, 403);
-    const email = String(body.userEmail ?? '').trim();
-    if (!email) return c.json({ error: 'Missing userEmail' }, 400);
-    const successUrl = String(body.successUrl ?? '').trim();
-    if (!successUrl) return c.json({ error: 'Missing successUrl' }, 400);
-    const { url } = await createPolarCheckoutSession({
-      planKey: body.planKey,
-      userId,
-      userEmail: email,
-      successUrl,
-      returnUrl: body.returnUrl ?? null,
-      genesisSlotPricePoint: body.genesisSlotPricePoint ?? null,
-    });
-    return c.json({ checkoutUrl: url });
-  } catch (error) {
-    console.error('create-checkout-session', error);
-    const message = error instanceof Error ? error.message : 'checkout_failed';
-    return c.json({ error: message }, 500);
-  }
-});
-
-app.get('/make-server-5a3d4811/billing/me', async (c) => {
-  try {
-    const userId = await verifyAuth(c.req.header('Authorization'));
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
-    const payload = await buildPolarBillingMe(supabase, userId);
-    return c.json(payload);
-  } catch (error) {
-    console.error('billing/me', error);
-    return c.json({ error: 'billing_me_failed' }, 500);
-  }
-});
-
-app.post('/make-server-5a3d4811/billing/customer-portal', async (c) => {
-  try {
-    const userId = await verifyAuth(c.req.header('Authorization'));
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
-    const body = (await c.req.json()) as { returnUrl?: string };
-    const returnUrl = String(body.returnUrl ?? '').trim();
-    if (!returnUrl) return c.json({ error: 'Missing returnUrl' }, 400);
-    const { customerPortalUrl } = await createPolarCustomerPortalSession({ userId, returnUrl });
-    return c.json({ customerPortalUrl });
-  } catch (error) {
-    console.error('customer-portal', error);
-    const message = error instanceof Error ? error.message : 'portal_failed';
-    return c.json({ error: message }, 500);
-  }
-});
-
-app.post('/make-server-5a3d4811/billing/sync-checkout', async (c) => {
-  try {
-    const userId = await verifyAuth(c.req.header('Authorization'));
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
-    const body = (await c.req.json()) as { checkoutId?: string };
-    const checkoutId = String(body.checkoutId ?? '').trim();
-    if (!checkoutId) return c.json({ error: 'Missing checkoutId' }, 400);
-    await fulfillFromCheckoutApi(supabase, checkoutId, userId);
-    const payload = await buildPolarBillingMe(supabase, userId);
-    return c.json({ ok: true, ...payload });
-  } catch (error) {
-    console.error('sync-checkout', error);
-    const message = error instanceof Error ? error.message : 'sync_failed';
-    return c.json({ error: message }, 500);
-  }
-});
-
-/**
- * Polar → Webhooks → URL to register (replace PROJECT_REF):
- * TODO_POLAR_WEBHOOK_URL → https://PROJECT_REF.supabase.co/functions/v1/make-server-5a3d4811/billing/polar-webhook
- * Enable event types handled in `processPolarWebhookEnvelope` (polar_billing.ts): order.created; subscription.* ;
- * customer.state_changed / customer.updated; checkout.updated (confirmed/succeeded).
- */
-app.post('/make-server-5a3d4811/billing/polar-webhook', async (c) => {
-  const rawBody = await c.req.text();
-  const polarEventId = c.req.header('webhook-id')?.trim() || `polar_body_${crypto.randomUUID()}`;
-  try {
-    const body = verifyPolarWebhook(rawBody, c.req.raw.headers);
-    const envelope = body as Record<string, unknown>;
-    const eventType = String(envelope.type ?? '');
-    const first = await markPolarEventStart(supabase, polarEventId, eventType);
-    if (!first) return c.json({ ok: true, duplicate: true });
-    try {
-      await processPolarWebhookEnvelope(supabase, envelope, polarEventId);
-    } catch (inner) {
-      console.error('polar_webhook_process', inner);
-      await markPolarEventError(supabase, polarEventId, inner instanceof Error ? inner.message : String(inner));
-      return c.json({ error: 'processing_failed' }, 500);
-    }
-    return c.json({ ok: true });
-  } catch (error) {
-    console.error('polar_webhook', error);
-    return c.json({ error: 'invalid_webhook' }, 400);
-  }
-});
-
 app.post('/make-server-5a3d4811/billing/report-webhook-delay', async (c) => {
   try {
     const userId = await verifyAuth(c.req.header('Authorization'));
@@ -944,7 +851,7 @@ app.post('/make-server-5a3d4811/internal/cron/reconcile-orphan-payments', async 
   }
 });
 
-/** EC-05 — manual link of orphan billing transaction row to a Supabase user (support / admin). */
+/** EC-05 — manual link of orphan provider transaction row to an existing Supabase user (support / admin). */
 app.post('/make-server-5a3d4811/internal/admin/link-orphan-payment', async (c) => {
   try {
     if (c.req.header('x-admin-billing-secret') !== Deno.env.get('ADMIN_BILLING_SECRET')) {
@@ -1024,6 +931,124 @@ app.post('/make-server-5a3d4811/billing/boost-pack/simulate', async (c) => {
   } catch (error) {
     console.error('Boost pack simulation error:', error);
     return c.json({ error: 'Error adding boost pack credits' }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/billing/dodo/checkout-session', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const body = (await c.req.json()) as { productId?: string; productKind?: string };
+    const productId = String(body.productId ?? '').trim();
+    if (!productId) return c.json({ error: 'Missing productId' }, 400);
+
+    const { data: prof } = await supabase.from('profiles').select('email, full_name').eq('id', userId).maybeSingle();
+    const email = (prof?.email as string | undefined) ?? null;
+    const fullName = (prof?.full_name as string | undefined)?.trim() || null;
+
+    const productKind = String(body.productKind ?? '').trim() || 'checkout';
+    const dup = await assertPrelaunchWebhookPurchaseAllowed(supabase, userId, productKind);
+    if (!dup.ok) {
+      return c.json({ error: dup.error, code: 'CHECKOUT_NOT_ALLOWED' }, 409);
+    }
+    const meta: Record<string, string> = { userId, productKind };
+    const em = email?.trim();
+    if (em) {
+      try {
+        const pt = await createCheckoutPassthrough(supabase, userId, em);
+        meta.passthroughToken = pt.token;
+      } catch {
+        /* optional */
+      }
+    }
+    const site = Deno.env.get('PUBLIC_APP_URL')?.trim() || 'https://www.quilora.app';
+    const returnUrl =
+      Deno.env.get('DODO_CHECKOUT_RETURN_URL')?.trim() || 'https://www.quilora.app/checkout/success';
+    const cancelUrl = Deno.env.get('DODO_CHECKOUT_CANCEL_URL')?.trim() || `${site}/pricing`;
+    const session = await dodoCreateCheckoutSession({
+      productCart: [{ product_id: productId, quantity: 1 }],
+      metadata: meta,
+      customerEmail: email,
+      customerName: fullName,
+      lockCustomerEmail: true,
+      returnUrl,
+      cancelUrl,
+    });
+    if ('error' in session) {
+      console.error('dodo checkout-session', session.error);
+      return c.json({ error: session.error }, 502);
+    }
+    return c.json({ checkoutUrl: session.checkoutUrl });
+  } catch (error) {
+    console.error('dodo checkout-session', error);
+    return c.json({ error: 'checkout_session_failed' }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/billing/dodo/customer-portal', async (c) => {
+  try {
+    const userId = await verifyAuth(c.req.header('Authorization'));
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    const { data: prof } = await supabase
+      .from('profiles')
+      .select('dodo_customer_id')
+      .eq('id', userId)
+      .maybeSingle();
+    const customerId = (prof?.dodo_customer_id as string | undefined)?.trim();
+    if (!customerId) return c.json({ error: 'No billing customer on file' }, 400);
+    const site = Deno.env.get('PUBLIC_APP_URL')?.trim() || 'https://www.quilora.app';
+    const portal = await dodoCreateCustomerPortalSession(customerId, `${site}/dashboard`);
+    if ('error' in portal) {
+      console.error('dodo portal', portal.error);
+      return c.json({ error: portal.error }, 502);
+    }
+    return c.json({ portalUrl: portal.link });
+  } catch (error) {
+    console.error('dodo portal', error);
+    return c.json({ error: 'portal_failed' }, 500);
+  }
+});
+
+app.post('/make-server-5a3d4811/payments/dodo/webhook', async (c) => {
+  try {
+    const rawBody = await c.req.text();
+    const hdr = (name: string) => c.req.header(name) ?? undefined;
+    const sig = await verifyDodoWebhook(rawBody, {
+      'webhook-id': hdr('webhook-id'),
+      'webhook-signature': hdr('webhook-signature'),
+      'webhook-timestamp': hdr('webhook-timestamp'),
+    });
+    if (!sig.ok) return c.json({ error: 'Invalid webhook signature' }, 401);
+
+    const webhookId = hdr('webhook-id')?.trim() ?? '';
+    if (!webhookId) return c.json({ error: 'Missing webhook-id' }, 400);
+    if (await hasProcessedDodoWebhook(supabase, webhookId)) return c.json({ ok: true, duplicate: true });
+
+    await processDodoWebhookPayload(supabase, sig.payload, webhookId);
+    await markDodoWebhookProcessed(supabase, webhookId);
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error('Dodo webhook error:', error);
+    return c.json({ error: 'Error handling Dodo webhook' }, 500);
+  }
+});
+
+/**
+ * Internal: apply an already-verified Dodo webhook payload (e.g. Next.js App Router entry forwards here).
+ * Secured with Supabase service role JWT only.
+ */
+app.post('/make-server-5a3d4811/billing/dodo/webhook-apply', async (c) => {
+  try {
+    const auth = c.req.header('Authorization') ?? '';
+    const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim();
+    if (!key || auth !== `Bearer ${key}`) return c.json({ error: 'Forbidden' }, 403);
+    const body = (await c.req.json()) as { payload?: Record<string, unknown>; webhookId?: string };
+    if (!body.payload || !body.webhookId?.trim()) return c.json({ error: 'Bad request' }, 400);
+    await processDodoWebhookPayload(supabase, body.payload, body.webhookId.trim());
+    return c.json({ ok: true });
+  } catch (error) {
+    console.error('webhook-apply', error);
+    return c.json({ error: 'webhook_apply_failed' }, 500);
   }
 });
 

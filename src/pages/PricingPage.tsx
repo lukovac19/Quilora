@@ -5,8 +5,8 @@ import { useApp } from '../context/AppContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { openPlanCheckout } from '../lib/billingCheckout';
-import type { InternalPlanKey } from '../lib/billing/types';
+import { openDodoCheckout, type CheckoutProductKey } from '../lib/billingCheckout';
+import { CheckoutButton } from '../components/CheckoutButton';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
 
 let pricingBoostCheckoutThrottleAt = 0;
@@ -14,7 +14,7 @@ let pricingBoostCheckoutThrottleAt = 0;
 export function PricingPage() {
   const { user } = useApp();
   const navigate = useNavigate();
-  const onCheckoutCompletedPlan = useCallback((_product: InternalPlanKey) => {
+  const onCheckoutCompletedPlan = useCallback((_product: CheckoutProductKey) => {
     navigate('/onboarding');
   }, [navigate]);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,8 +71,8 @@ export function PricingPage() {
     const email = user.email;
     let cancelled = false;
     void (async () => {
-      const res = await openPlanCheckout({
-        planKey: 'boost_pack',
+      const res = await openDodoCheckout({
+        product: 'boost_pack',
         userId: uid,
         email,
       });
@@ -86,7 +86,7 @@ export function PricingPage() {
         { replace: true },
       );
       if (!res.ok) {
-        if (res.reason === 'not_configured') {
+        if (res.reason === 'no_dodo' || res.reason === 'no_price') {
           if (import.meta.env.DEV) toast.message(res.message);
         } else {
           toast.error(res.message);
@@ -252,9 +252,9 @@ export function PricingPage() {
         </div>
       </section>
 
-      {/* Boost Pack — same offer as Payments / credits context */}
+      {/* Boost Pack + optional token add-ons (Dodo product IDs from env) */}
       <section className="px-4 pb-12 sm:px-6 sm:pb-16">
-        <div className="container mx-auto max-w-6xl">
+        <div className="container mx-auto max-w-6xl space-y-8">
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/40 to-[#0a1929]/40 p-8 sm:p-10">
             <h2 className="text-2xl font-bold text-white">Running low before your renewal?</h2>
             <p className="mt-2 text-base text-white/60">Grab a Boost Pack to keep going</p>
@@ -266,8 +266,8 @@ export function PricingPage() {
                   navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing?checkout=boost'));
                   return;
                 }
-                void openPlanCheckout({ planKey: 'boost_pack', userId: user.id, email: user.email }).then((res) => {
-                  if (!res.ok && res.reason !== 'not_configured') toast.error(res.message);
+                void openDodoCheckout({ product: 'boost_pack', userId: user.id, email: user.email }).then((res) => {
+                  if (!res.ok && res.reason !== 'no_dodo' && res.reason !== 'no_price') toast.error(res.message);
                   else if (!res.ok && import.meta.env.DEV) toast.message(res.message);
                   else if (res.ok) toast.success('Checkout opened — credits apply after payment is confirmed.');
                 });
@@ -278,6 +278,40 @@ export function PricingPage() {
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>
+
+          {(import.meta.env.VITE_DODO_PRODUCT_TOKENS_SMALL as string | undefined)?.trim() ||
+          (import.meta.env.VITE_DODO_PRODUCT_TOKENS_MEDIUM as string | undefined)?.trim() ||
+          (import.meta.env.VITE_DODO_PRODUCT_TOKENS_LARGE as string | undefined)?.trim() ? (
+            <div className="rounded-2xl border border-white/10 bg-[#0a1929]/60 p-8 sm:p-10">
+              <h2 className="text-xl font-bold text-white">Token add-ons</h2>
+              <p className="mt-2 text-sm text-white/55">
+                One-time credit packs (higher plans include more monthly credits). Configure product IDs in the environment.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-4">
+                {(import.meta.env.VITE_DODO_PRODUCT_TOKENS_SMALL as string | undefined)?.trim() ? (
+                  <CheckoutButton
+                    productId={String(import.meta.env.VITE_DODO_PRODUCT_TOKENS_SMALL).trim()}
+                    label="Small token pack"
+                    productKind="tokens_small"
+                  />
+                ) : null}
+                {(import.meta.env.VITE_DODO_PRODUCT_TOKENS_MEDIUM as string | undefined)?.trim() ? (
+                  <CheckoutButton
+                    productId={String(import.meta.env.VITE_DODO_PRODUCT_TOKENS_MEDIUM).trim()}
+                    label="Medium token pack"
+                    productKind="tokens_medium"
+                  />
+                ) : null}
+                {(import.meta.env.VITE_DODO_PRODUCT_TOKENS_LARGE as string | undefined)?.trim() ? (
+                  <CheckoutButton
+                    productId={String(import.meta.env.VITE_DODO_PRODUCT_TOKENS_LARGE).trim()}
+                    label="Large token pack"
+                    productKind="tokens_large"
+                  />
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       </section>
 

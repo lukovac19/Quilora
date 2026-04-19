@@ -128,6 +128,19 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------
+-- genesis_slots (inventory — no FK to other app tables)
+-- Must exist before release_genesis_slot() because PL/pgSQL validates %rowtype at CREATE.
+-- ---------------------------------------------------------------------------
+create table if not exists public.genesis_slots (
+  id uuid primary key default gen_random_uuid(),
+  price_point text not null,
+  slots_total integer not null,
+  slots_used integer not null default 0,
+  created_at timestamptz not null default now(),
+  unique (price_point)
+);
+
+-- ---------------------------------------------------------------------------
 -- Release Genesis slot (refund / cancel — EC-07)
 -- ---------------------------------------------------------------------------
 create or replace function public.release_genesis_slot(p_price_point text)

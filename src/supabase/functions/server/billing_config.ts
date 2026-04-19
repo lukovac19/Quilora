@@ -43,6 +43,8 @@ export const TIER_LIMITS: Record<QuiloraTier, { monthlyCredits: number; maxSandb
 export const GENESIS_SLOT_LIMITS = {
   genesis80: 50,
   genesis119: 150,
+  /** Bundled lifetime + 1Y Sage — high cap, inventory row `176` */
+  genesis176: 100_000,
 } as const;
 
 export function sourceUploadCreditCost(pages: number): number {

@@ -149,13 +149,13 @@ export async function applyGenesisPerks(
   admin: SupabaseClient,
   userId: string,
   sourceId: string,
-  slotTier: 'genesis_80' | 'genesis_119' = 'genesis_80',
+  slotTier: 'genesis_80' | 'genesis_119' | 'genesis_176' = 'genesis_80',
 ) {
   const row = await getProfile(admin, userId);
   const bal = Number(row?.credit_balance ?? 0);
   const target = 15000;
   const delta = target - bal;
-  const pricePoint = slotTier === 'genesis_119' ? '119' : '80';
+  const pricePoint = slotTier === 'genesis_119' ? '119' : slotTier === 'genesis_176' ? '176' : '80';
 
   await admin.from('profiles').update({
     tier: 'genesis',

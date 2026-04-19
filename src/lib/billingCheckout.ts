@@ -1,33 +1,90 @@
-import { quiloraPublicAppUrl } from './billing/polar';
-// Checkout redirect URLs are derived from `quiloraPublicAppUrl()` → TODO_APP_URL (`VITE_APP_URL`).
-import type { InternalPlanKey } from './billing/types';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from './quiloraEdge';
 import { scheduleWebhookDelayWatchAfterCheckout } from './postCheckoutWebhookDelayWatch';
 import { supabase } from './supabase';
 
+function readClientEnv(...keys: string[]): string | undefined {
+  const env = import.meta.env as Record<string, string | undefined>;
+  for (const k of keys) {
+    const v = env[k]?.trim();
+    if (v) return v;
+  }
+  return undefined;
+}
+
 export type GenesisInventory = {
   genesis80: { sold: number; cap: number; remaining: number };
   genesis119: { sold: number; cap: number; remaining: number };
+  genesis176: { sold: number; cap: number; remaining: number };
 };
 
-const AFTER_CHECKOUT_NAV_KEY = 'quilora_after_checkout_nav';
+export type CheckoutProductKey =
+  | 'bookworm_monthly'
+  | 'bookworm_yearly'
+  | 'sage_monthly'
+  | 'sage_yearly'
+  | 'lifetime_early_bird'
+  | 'lifetime_standard'
+  | 'lifetime_plus_sage'
+  | 'boost_pack';
 
-/** When set, after a successful Genesis checkout we immediately start this plan checkout (bundle: LTD + Sage year). */
-export const POLAR_POST_GENESIS_PLAN_KEY = 'quilora_post_genesis_plan_key';
+const PRODUCT_ENV_KEYS: Record<CheckoutProductKey, readonly string[]> = {
+  bookworm_monthly: ['NEXT_PUBLIC_PRICE_ID_BOOKWORM_MONTHLY', 'VITE_DODO_PRODUCT_BOOKWORM_MONTHLY'],
+  bookworm_yearly: ['NEXT_PUBLIC_PRICE_ID_BOOKWORM_YEARLY', 'VITE_DODO_PRODUCT_BOOKWORM_YEARLY'],
+  sage_monthly: ['NEXT_PUBLIC_PRICE_ID_SAGE_MONTHLY', 'VITE_DODO_PRODUCT_BIBLIOPHILE_MONTHLY'],
+  sage_yearly: ['NEXT_PUBLIC_PRICE_ID_SAGE_YEARLY', 'VITE_DODO_PRODUCT_BIBLIOPHILE_YEARLY'],
+  lifetime_early_bird: ['NEXT_PUBLIC_PRICE_ID_LIFETIME_EARLY_BIRD', 'VITE_DODO_PRODUCT_GENESIS_80'],
+  lifetime_standard: ['NEXT_PUBLIC_PRICE_ID_LIFETIME_STANDARD', 'VITE_DODO_PRODUCT_GENESIS_119'],
+  lifetime_plus_sage: ['NEXT_PUBLIC_PRICE_ID_LIFETIME_PLUS_SAGE'],
+  boost_pack: ['VITE_DODO_PRODUCT_BOOST_PACK'],
+};
+
+function productIdFor(product: CheckoutProductKey): string | null {
+  const keys = PRODUCT_ENV_KEYS[product];
+  const v = readClientEnv(...keys);
+  return v || null;
+}
+
+/** Public Dodo product / price id for overlay checkout (from `NEXT_PUBLIC_PRICE_ID_*` or legacy `VITE_*`). */
+export function getCheckoutProductId(product: CheckoutProductKey): string | null {
+  return productIdFor(product);
+}
+
+export function dodoCheckoutConfigured(): boolean {
+  return Boolean(readClientEnv('NEXT_PUBLIC_PRICE_ID_BOOKWORM_MONTHLY', 'VITE_DODO_PRODUCT_BOOKWORM_MONTHLY'));
+}
+
+export function priceConfigured(product: CheckoutProductKey): boolean {
+  return Boolean(productIdFor(product));
+}
 
 export async function fetchGenesisInventory(): Promise<GenesisInventory | null> {
   try {
-    const data = await quiloraEdgeGetJson<{ inventory?: GenesisInventory }>(`${QUILORA_EDGE_SLUG}/billing/genesis-inventory`);
-    return data.inventory ?? null;
+    const data = await quiloraEdgeGetJson<{ inventory?: GenesisInventory }>(
+      `${QUILORA_EDGE_SLUG}/billing/genesis-inventory`,
+    );
+    const inv = data.inventory;
+    if (!inv) return null;
+    return {
+      genesis80: inv.genesis80,
+      genesis119: inv.genesis119,
+      genesis176: inv.genesis176 ?? { sold: 0, cap: 100_000, remaining: 100_000 },
+    };
   } catch {
     return null;
   }
 }
 
-export function isGenesisSoldOut(inventory: GenesisInventory | null, slot: '80' | '119' | 'genesis_80' | 'genesis_119'): boolean {
+export function isEarlyBirdSoldOut(inventory: GenesisInventory | null): boolean {
   if (!inventory) return false;
-  const normalized = slot === 'genesis_80' || slot === '80' ? '80' : '119';
-  const row = normalized === '80' ? inventory.genesis80 : inventory.genesis119;
+  return inventory.genesis80.remaining <= 0;
+}
+
+export function isGenesisSoldOut(
+  inventory: GenesisInventory | null,
+  product: 'lifetime_early_bird' | 'lifetime_standard',
+): boolean {
+  if (!inventory) return false;
+  const row = product === 'lifetime_early_bird' ? inventory.genesis80 : inventory.genesis119;
   return row.remaining <= 0;
 }
 
@@ -36,87 +93,116 @@ export function lifetimeDealSeatsRemaining(inventory: GenesisInventory | null): 
   return inventory.genesis80.remaining + inventory.genesis119.remaining;
 }
 
-export type OpenCheckoutResult =
-  | { ok: true }
-  | { ok: false; reason: 'not_configured' | 'network' | 'sold_out'; message: string };
-
-export type PlanCheckoutParams = {
-  planKey: InternalPlanKey;
-  userId: string;
-  email: string;
-  /** Where to navigate after successful return + sync (default `/onboarding`). */
-  afterSuccessNavigate?: string;
-  genesisSlotPricePoint?: '80' | '119' | null;
+export type CheckoutEligibility = {
+  ok: boolean;
+  error: string | null;
+  userPlan: { plan: string; subscription_status: string | null; is_lifetime: boolean } | null;
 };
 
-/**
- * Server-created Polar checkout (redirect). Never uses organization tokens on the client.
- */
-export async function openPlanCheckout(params: PlanCheckoutParams): Promise<OpenCheckoutResult> {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  const token = session?.access_token;
-  if (!token) {
-    return { ok: false, reason: 'not_configured', message: 'Please sign in to continue.' };
+export async function fetchCheckoutEligibility(productKind: string): Promise<CheckoutEligibility | null> {
+  try {
+    const { data: auth } = await supabase.auth.getSession();
+    const bearer = auth.session?.access_token;
+    if (!bearer) return null;
+    return await quiloraEdgeGetJson<CheckoutEligibility>(
+      `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-eligibility?productKind=${encodeURIComponent(productKind)}`,
+      bearer,
+    );
+  } catch {
+    return null;
   }
-  if (!params.email?.trim()) {
-    return { ok: false, reason: 'not_configured', message: 'Missing email for checkout.' };
+}
+
+export type OpenCheckoutResult =
+  | { ok: true }
+  | { ok: false; reason: 'no_dodo' | 'no_price' | 'sold_out' | 'checkout_error' | 'not_allowed'; message: string };
+
+/**
+ * Opens Dodo overlay checkout. Session is created on the server (API key never touches the browser).
+ */
+export async function openDodoCheckout(params: {
+  product: CheckoutProductKey;
+  userId: string;
+  email?: string | null;
+  onCheckoutCompleted?: (product: CheckoutProductKey) => void;
+}): Promise<OpenCheckoutResult> {
+  const productId = productIdFor(params.product);
+    if (!dodoCheckoutConfigured()) {
+    return {
+      ok: false,
+      reason: 'no_dodo',
+      message: 'Checkout is not configured (set NEXT_PUBLIC_PRICE_ID_* or legacy VITE_DODO product IDs).',
+    };
+  }
+  if (!productId) {
+    return { ok: false, reason: 'no_price', message: 'Checkout is not configured (missing product ID for this plan).' };
   }
 
-  if (params.planKey === 'genesis_lifetime') {
+  const elig = await fetchCheckoutEligibility(params.product);
+  if (elig && !elig.ok) {
+    return {
+      ok: false,
+      reason: 'not_allowed',
+      message:
+        elig.error === 'DUPLICATE_BOOKWORM' || elig.error === 'DUPLICATE_SAGE' || elig.error === 'DUPLICATE_GENESIS'
+          ? 'You already have an active plan for this checkout.'
+          : elig.error || 'Checkout is not available for your account.',
+    };
+  }
+
+  if (params.product === 'lifetime_early_bird' || params.product === 'lifetime_standard') {
     const inv = await fetchGenesisInventory();
-    const slot = params.genesisSlotPricePoint === '119' ? '119' : '80';
-    if (isGenesisSoldOut(inv, slot)) {
-      return { ok: false, reason: 'sold_out', message: 'That Genesis tier is sold out.' };
+    if (isGenesisSoldOut(inv, params.product)) {
+      return { ok: false, reason: 'sold_out', message: 'This tier is sold out' };
     }
   }
-
-  const appUrl = quiloraPublicAppUrl(); // TODO_APP_URL
-  // Polar success redirect — `{CHECKOUT_ID}` is substituted by Polar at redirect time.
-  const successUrl = `${appUrl}/billing/success?checkout_id={CHECKOUT_ID}`;
-  const returnUrl = `${appUrl}/pricing?checkout=cancelled`;
 
   try {
-    const nav = params.afterSuccessNavigate ?? '/onboarding';
-    try {
-      sessionStorage.setItem(AFTER_CHECKOUT_NAV_KEY, nav);
-    } catch {
-      /* ignore */
+    const { data: auth } = await supabase.auth.getSession();
+    const bearer = auth.session?.access_token;
+    if (!bearer) {
+      return { ok: false, reason: 'checkout_error', message: 'Sign in to continue to checkout.' };
     }
-    const data = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
-      `${QUILORA_EDGE_SLUG}/billing/create-checkout-session`,
-      token,
-      {
-        planKey: params.planKey,
-        userId: params.userId,
-        userEmail: params.email.trim(),
-        successUrl,
-        returnUrl,
-        genesisSlotPricePoint: params.genesisSlotPricePoint ?? null,
-      },
+
+    if (params.product === 'lifetime_early_bird' || params.product === 'lifetime_standard') {
+      const invFinal = await fetchGenesisInventory();
+      if (isGenesisSoldOut(invFinal, params.product)) {
+        return {
+          ok: false,
+          reason: 'sold_out',
+          message: 'That seat was just taken. Refresh the page and try again.',
+        };
+      }
+    }
+
+    const session = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
+      `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-session`,
+      bearer,
+      { productId, productKind: params.product },
     );
-    if (data.error || !data.checkoutUrl) {
+    const checkoutUrl = session.checkoutUrl?.trim();
+    if (!checkoutUrl) {
       return {
         ok: false,
-        reason: 'network',
-        message: data.error ?? 'Could not start checkout.',
+        reason: 'checkout_error',
+        message: session.error || 'Could not start checkout.',
       };
     }
-    scheduleWebhookDelayWatchAfterCheckout(params.userId, params.planKey);
-    window.location.href = data.checkoutUrl;
+
+    scheduleWebhookDelayWatchAfterCheckout(params.userId, params.product);
+    params.onCheckoutCompleted?.(params.product);
+    window.location.assign(checkoutUrl);
+
     return { ok: true };
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : 'Checkout request failed.';
-    return { ok: false, reason: 'network', message };
+    const message = e instanceof Error ? e.message : 'Checkout failed to open.';
+    if (/DUPLICATE_|BLOCK_BW|CHECKOUT_NOT_ALLOWED/i.test(message)) {
+      return {
+        ok: false,
+        reason: 'not_allowed',
+        message: 'You already have an active plan or this checkout is not available for your account.',
+      };
+    }
+    return { ok: false, reason: 'checkout_error', message };
   }
-}
-
-/** Polar checkout is always server-configured; “not configured” is returned as a failed openPlanCheckout result. */
-export function polarCheckoutConfigured(): boolean {
-  return true;
-}
-
-export function priceConfigured(_planKey: InternalPlanKey): boolean {
-  return true;
 }

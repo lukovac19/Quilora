@@ -23,25 +23,32 @@ drop type if exists payment_provider cascade;
 drop type if exists quilora_tier cascade;
 
 -- ---------------------------------------------------------------------------
--- profiles
+-- profiles (skip creation when table already exists — e.g. Supabase default + data)
 -- ---------------------------------------------------------------------------
-create table public.profiles (
-  id uuid primary key references auth.users (id) on delete cascade,
-  email text not null,
-  full_name text,
-  avatar_url text,
-  tier text not null default 'bookworm' check (tier in ('bookworm', 'bibliophile', 'genesis')),
-  credit_balance integer not null default 0,
-  streak_count integer not null default 0,
-  streak_goal integer not null default 1,
-  genesis_badge boolean not null default false,
-  alpha_lab_access boolean not null default false,
-  last_streak_date date,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
+do $$
+begin
+  if not exists (
+    select from pg_tables where schemaname = 'public' and tablename = 'profiles'
+  ) then
+    create table public.profiles (
+      id uuid primary key references auth.users (id) on delete cascade,
+      email text not null,
+      full_name text,
+      avatar_url text,
+      tier text not null default 'bookworm' check (tier in ('bookworm', 'bibliophile', 'genesis')),
+      credit_balance integer not null default 0,
+      streak_count integer not null default 0,
+      streak_goal integer not null default 1,
+      genesis_badge boolean not null default false,
+      alpha_lab_access boolean not null default false,
+      last_streak_date date,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  end if;
+end $$;
 
-create index idx_profiles_email on public.profiles (email);
+create index if not exists idx_profiles_email on public.profiles (email);
 
 -- ---------------------------------------------------------------------------
 -- sandboxes (+ read_only for downgrade flow beyond 5th sandbox)
@@ -486,8 +493,6 @@ end;
 $$;
 
 grant execute on function public.reserve_genesis_slot(text) to service_role;
-
-grant execute on function public.apply_bookworm_readonly_overflow(uuid) to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Bibliophile downgrade: mark excess sandboxes read-only

@@ -1,6 +1,6 @@
 import type { QuiloraProfileTier } from '../context/AppContext';
 
-/** EP-02: paid Sage/Genesis, active paid subscription (Polar), or explicit Bookworm plan confirmation. */
+/** EP-02: paid Sage/Genesis, active paid subscription (Dodo), or explicit Bookworm plan confirmation. */
 export function computeBillingGatePassed(params: {
   profileTier: QuiloraProfileTier;
   planSelectionCompleted: boolean;

@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
   const deepseekKey = env.DEEPSEEK_API_KEY?.trim() ?? '';
 
   return {
+    envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
     plugins: [react(), tailwindcss(), figmaAssetResolver(), quiloraAiProxyPlugin()],
     resolve: {
       extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],

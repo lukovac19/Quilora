@@ -1,8 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { computeBillingGatePassed } from '../lib/billingGate';
-import { subscriptionRowGrantsPaidSeat } from '../lib/billing/effectiveBillingState';
-import { normalizeBillingState, type BillingMePayload } from '../lib/billing/status';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson } from '../lib/quiloraEdge';
 import { registerPostCheckoutWebhookDelayWatch } from '../lib/postCheckoutWebhookDelayWatch';
 
@@ -36,7 +34,7 @@ export interface User {
   emailProductTips?: boolean;
   /** Study reminder emails (auth user_metadata). */
   emailStudyReminders?: boolean;
-  /** EP-02: false until Bookworm plan is confirmed on /pricing or paid subscription is active / paid tier. */
+  /** EP-02: false until Bookworm plan is confirmed on /pricing or a paid subscription is active. */
   billingGatePassed: boolean;
 }
 
@@ -148,7 +146,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null;
     }
     const u = session.user;
-    const [{ data: profile }, { data: subRows }] = await Promise.all([
+    const [{ data: profile }, subCountRes] = await Promise.all([
       supabase
         .from('profiles')
         .select(
@@ -158,19 +156,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         .maybeSingle(),
       supabase
         .from('subscriptions')
-        .select('status, cancel_at_period_end, current_period_end, is_lifetime, internal_plan_key, billing_provider')
+        .select('*', { count: 'exact', head: true })
         .eq('user_id', u.id)
-        .order('updated_at', { ascending: false })
-        .limit(1),
+        .eq('status', 'active'),
     ]);
-    const sub = subRows?.[0] ?? null;
-    let edgeBillingActive = false;
-    try {
-      const me = await quiloraEdgeGetJson<BillingMePayload>(`${QUILORA_EDGE_SLUG}/billing/me`, session.access_token);
-      edgeBillingActive = Boolean(normalizeBillingState(me)?.activeAccess);
-    } catch {
-      edgeBillingActive = false;
-    }
+    const activeSubCount = subCountRes.count;
     const meta = u.user_metadata as {
       name?: string;
       email_product_tips?: boolean;
@@ -186,15 +176,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       rawTier === 'bibliophile' || rawTier === 'genesis' ? rawTier : 'bookworm';
     const emailConfirmed = Boolean(u.email_confirmed_at);
     const planSelectionCompleted = Boolean((profile as { plan_selection_completed?: boolean } | null)?.plan_selection_completed);
-    const subGrants = sub
-      ? subscriptionRowGrantsPaidSeat({
-          status: sub.status as string,
-          cancel_at_period_end: sub.cancel_at_period_end as boolean | null,
-          current_period_end: sub.current_period_end as string | null,
-          is_lifetime: sub.is_lifetime as boolean | null,
-        })
-      : false;
-    const hasActivePaidSubscription = edgeBillingActive || subGrants;
+    const hasActivePaidSubscription = (activeSubCount ?? 0) > 0;
     const billingGatePassed = computeBillingGatePassed({
       profileTier,
       planSelectionCompleted,

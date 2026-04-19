@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import type { InternalPlanKey } from '../lib/billing/types';
+import type { CheckoutProductKey } from '../lib/billingCheckout';
 import { useTranslation } from '../lib/translations';
 import { useApp } from '../context/AppContext';
 import type { LucideIcon } from 'lucide-react';
@@ -17,7 +17,7 @@ export function QuiloraLandingPage() {
   const { t } = useTranslation();
   const { theme } = useApp();
   const navigate = useNavigate();
-  const onCheckoutCompletedPlan = useCallback((_product: InternalPlanKey) => {
+  const onCheckoutCompletedPlan = useCallback((_product: CheckoutProductKey) => {
     navigate('/onboarding');
   }, [navigate]);
   const colors = getThemeColors(theme);

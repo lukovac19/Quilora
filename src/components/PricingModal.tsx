@@ -2,8 +2,7 @@ import { useApp, type User } from '../context/AppContext';
 import { useTranslation } from '../lib/translations';
 import { supabase } from '../lib/supabase';
 import { quiloraEdgePostJson, QUILORA_EDGE_SLUG } from '../lib/quiloraEdge';
-import { openPlanCheckout } from '../lib/billingCheckout';
-import type { InternalPlanKey } from '../lib/billing/types';
+import { dodoCheckoutConfigured, openDodoCheckout, priceConfigured } from '../lib/billingCheckout';
 import { X, Check, Zap, Target, Sparkles, Infinity } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
@@ -23,30 +22,35 @@ export function PricingModal({ isOpen, onClose, user: propsUser }: PricingModalP
   const handleUpgrade = async (tier: 'normal' | 'hardquest' | 'lifetime' | 'blitz') => {
     if (!user || tier === 'blitz') return;
 
-    const planByTier: Record<'normal' | 'hardquest' | 'lifetime', InternalPlanKey> = {
+    const productByTier = {
       normal: 'bookworm_monthly',
       hardquest: 'sage_monthly',
-      lifetime: 'genesis_lifetime',
-    };
-    const planKey = planByTier[tier];
+      lifetime: 'lifetime_early_bird',
+    } as const;
+    const product = productByTier[tier];
 
-    const polarRes = await openPlanCheckout({
-      planKey,
-      userId: user.id,
-      email: user.email,
-      genesisSlotPricePoint: tier === 'lifetime' ? '80' : null,
-    });
-    if (polarRes.ok) {
-      onClose();
-      return;
-    }
-    if (polarRes.reason === 'sold_out') {
-      toast.error(polarRes.message);
-      return;
-    }
-    if (polarRes.reason !== 'not_configured') {
-      toast.error(polarRes.message);
-      return;
+    if (dodoCheckoutConfigured() && priceConfigured(product)) {
+      const res = await openDodoCheckout({
+        product,
+        userId: user.id,
+        email: user.email,
+      });
+      if (res.ok) {
+        onClose();
+        return;
+      }
+      if (res.reason === 'sold_out') {
+        toast.error(res.message);
+        return;
+      }
+      if (res.reason === 'not_allowed') {
+        toast.error(res.message);
+        return;
+      }
+      if (res.reason !== 'no_dodo' && res.reason !== 'no_price') {
+        toast.error(res.message);
+        return;
+      }
     }
 
     try {

@@ -29,7 +29,7 @@ export const PRELAUNCH_PROMISE_REGISTRY: PromiseSection[] = [
     bullets: [
       'Scope: 50% off standard pricing for the pre-launch window shown on the pricing page.',
       'Product decision: lock the dollar amounts shown at checkout ($3 / $8 Bookworm & Sage pre-launch, annual totals as displayed) for the life of that subscription while it remains active — not a perpetual “50%” percentage if list prices change.',
-      'If standard prices change later, grandfathering follows the locked checkout amounts and Polar subscription products configured for that checkout.',
+      'If standard prices change later, grandfathering follows the locked checkout amounts and Dodo subscription products configured for that checkout.',
     ],
   },
   {
@@ -39,7 +39,7 @@ export const PRELAUNCH_PROMISE_REGISTRY: PromiseSection[] = [
     bullets: [
       'Trigger: “Public launch” has not occurred — defined as pre-launch flags lifted and full canvas access enabled for all paid accounts (see `app_settings.public_launch` + product gates).',
       'Beta or soft launch does not satisfy the public-launch definition.',
-      'Mechanism: automated Polar refunds where `POLAR_ACCESS_TOKEN` has refunds scope; legacy `txn_*` rows require manual support completion.',
+      'Mechanism: automated Dodo Payments refund API where `DODO_PAYMENTS_API_KEY` is configured; otherwise support is notified via `email_outbox` for manual completion.',
       'Cron: `POST …/internal/cron/ninety-day-refund` (secured with `CRON_SECRET`).',
     ],
   },
@@ -60,9 +60,9 @@ export const PRELAUNCH_PROMISE_REGISTRY: PromiseSection[] = [
     tags: ['PAY', 'AUTH'],
     bullets: [
       'Monthly: first period charged at the pre-launch rate at checkout — no “trial” that delays first payment.',
-      'Annual: full year charged upfront at the discounted annual totals shown; renewal reverts to standard pricing after the first annual term as configured in Polar.',
+      'Annual: full year charged upfront at the discounted annual totals shown; renewal reverts to standard pricing after the first annual term as configured in Dodo.',
       'LTD: one-time charge today; no recurring billing for the lifetime entitlement.',
-      'LTD + Sage bundle: the live app may open sequential Polar checkouts until a single bundled price is configured — both paths are logged to `billing_transactions` for reconciliation.',
+      'LTD + Sage bundle: the live app may open sequential checkouts until a single bundled price is configured — both paths are logged to `provider_transactions` for reconciliation.',
       'Credits and canvas: spendable credits may be shown during Phase 4 “holding”; full canvas unlock follows public launch (Phase 5).',
       '90-day guarantee: if public launch (as defined) has not occurred within 90 days of the cohort’s earliest `first_prelaunch_purchase_at`, refunds run per EC-08 automation + email `email_4_90_day_refund`.',
     ],
@@ -74,11 +74,11 @@ export const PRELAUNCH_PROMISE_REGISTRY: PromiseSection[] = [
     bullets: [
       'Email 0: Supabase verification (immediate on sign-up) — AUTH-01.',
       'Email 1: Purchase confirmation + tier summary + refund policy — queued as `email_1_purchase_confirmation` from Edge after successful webhook handling.',
-      'Email 1.5: Recovery — `email_1_5_recovery_setup` at ≥6h and ≥24h for orphan billing rows without a linked profile (EC-04).',
+      'Email 1.5: Recovery — `email_1_5_recovery_setup` at ≥6h and ≥24h for orphan payment rows without a linked profile (EC-04).',
       'Email 2: Launch day — `email_2_launch_day` enqueued when `finalize_public_launch` succeeds.',
       'Email 3: Cancel confirmation — `email_3_cancel_confirmation` on pre-launch cancel paths.',
       'Email 4: 90-day policy — `email_4_90_day_refund` when the ninety-day cron fires.',
-      'Support templates: `email_support_alert_unclaimed_payment`, `email_support_billing_refund_failed`, `email_support_billing_refund_manual`, `email_support_billing_cancel_failed`, `email_ec03_webhook_delay_support`.',
+      'Support templates: `email_support_alert_unclaimed_payment`, `email_support_dodo_refund_failed`, `email_support_dodo_cancel_failed`, `email_ec03_webhook_delay_support`.',
     ],
   },
 ];

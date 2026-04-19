@@ -4,13 +4,16 @@ import { Check, Info } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { useApp } from '../../context/AppContext';
 import {
-  openPlanCheckout,
+  openDodoCheckout,
   fetchGenesisInventory,
+  getCheckoutProductId,
+  isEarlyBirdSoldOut,
   isGenesisSoldOut,
   lifetimeDealSeatsRemaining,
+  type CheckoutProductKey,
   type GenesisInventory,
 } from '../../lib/billingCheckout';
-import type { InternalPlanKey } from '../../lib/billing/types';
+import { CheckoutButton } from '../CheckoutButton';
 import { markGenesisChoiceFlowPending } from '../../lib/genesisEarlyAccessSession';
 import { assertPrelaunchCheckoutAllowed } from '../../lib/prelaunchPurchaseGuards';
 import { DuplicatePrelaunchPurchaseModal } from '../prelaunch/DuplicatePrelaunchPurchaseModal';
@@ -19,8 +22,8 @@ import { ScrollReveal } from '../ScrollReveal';
 export type PricingPlansBlockProps = {
   /** Early access: Monthly/Yearly toggle and plan cards only (no genesis banner, tax line, comparison table). */
   earlyAccessPricing?: boolean;
-  /** When checkout cannot open (e.g. dev without secrets), optional fallback callback. */
-  onCheckoutCompleted?: (product: InternalPlanKey) => void;
+  /** When set, checkout completion in this tab invokes this (early access and default pricing). */
+  onCheckoutCompleted?: (product: CheckoutProductKey) => void;
 };
 
 /** Shared Bookworm · Sage · Genesis grid — used on /pricing and landing (#pricing) to stay in sync. */
@@ -52,8 +55,8 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   useEffect(() => {
     const load = () => void fetchGenesisInventory().then(setGenesisInventory);
     load();
-    if (!earlyAccessPricing) return undefined;
-    const id = window.setInterval(load, 30000);
+    const pollMs = earlyAccessPricing ? 10_000 : 10_000;
+    const id = window.setInterval(load, pollMs);
     const onVis = () => {
       if (document.visibilityState === 'visible') load();
     };
@@ -64,187 +67,148 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
     };
   }, [earlyAccessPricing]);
 
-  const afterNav = onCheckoutCompleted ? '/onboarding' : undefined;
+  const handleGetStarted = useCallback(() => {
+    navigate('/auth?mode=signup');
+  }, [navigate]);
+
+  const completedOpt = useMemo(() => {
+    if (onCheckoutCompleted) return { onCheckoutCompleted };
+    return {} as { onCheckoutCompleted?: (p: CheckoutProductKey) => void };
+  }, [onCheckoutCompleted]);
 
   const runCheckoutSubscription = useCallback(async () => {
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
       return;
     }
-    if (!user.emailConfirmed) {
-      toast.error('Please verify your email before continuing to checkout.');
-      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/pricing'));
-      return;
-    }
-    const yearlyKey: InternalPlanKey = 'bookworm_yearly';
-    const monthlyKey: InternalPlanKey = 'bookworm_monthly';
+    const yearlyKey: CheckoutProductKey = 'bookworm_yearly';
+    const monthlyKey: CheckoutProductKey = 'bookworm_monthly';
     const primary = displayedBilling ? yearlyKey : monthlyKey;
-    let res = await openPlanCheckout({
-      planKey: primary,
+    let res = await openDodoCheckout({
+      product: primary,
       userId: user.id,
       email: user.email,
-      afterSuccessNavigate: afterNav,
+      ...completedOpt,
     });
-    if (!res.ok && displayedBilling && primary !== monthlyKey) {
-      res = await openPlanCheckout({
-        planKey: monthlyKey,
+    if (!res.ok && res.reason === 'no_price' && displayedBilling) {
+      res = await openDodoCheckout({
+        product: monthlyKey,
         userId: user.id,
         email: user.email,
-        afterSuccessNavigate: afterNav,
+        ...completedOpt,
       });
     }
     if (!res.ok && res.reason === 'sold_out') {
       toast.error(res.message);
       return;
     }
-    if (!res.ok && res.reason === 'not_configured') {
-      console.warn('[checkout] not_configured', res.message);
-      toast.error(res.message);
+    if (!res.ok && (res.reason === 'no_dodo' || res.reason === 'no_price')) {
+      if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(primary);
         return;
       }
-      if (/please sign in/i.test(res.message)) {
-        navigate('/auth?mode=login&redirect=' + encodeURIComponent('/pricing'));
-      }
+      handleGetStarted();
       return;
     }
-    if (!res.ok) {
-      console.warn('[checkout]', res.reason, res.message);
-      toast.error(res.message);
-    }
-  }, [user, displayedBilling, navigate, afterNav, onCheckoutCompleted]);
+    if (!res.ok) toast.error(res.message);
+  }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
 
   const runBibliophileCheckout = useCallback(async () => {
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
       return;
     }
-    if (!user.emailConfirmed) {
-      toast.error('Please verify your email before continuing to checkout.');
-      navigate('/auth/verify-email?redirect=' + encodeURIComponent('/pricing'));
-      return;
-    }
-    const yearlyKey: InternalPlanKey = 'sage_yearly';
-    const monthlyKey: InternalPlanKey = 'sage_monthly';
+    const yearlyKey: CheckoutProductKey = 'sage_yearly';
+    const monthlyKey: CheckoutProductKey = 'sage_monthly';
     const primary = displayedBilling ? yearlyKey : monthlyKey;
-    let res = await openPlanCheckout({
-      planKey: primary,
-      userId: user.id,
-      email: user.email,
-      afterSuccessNavigate: afterNav,
-    });
-    if (!res.ok && displayedBilling && primary !== monthlyKey) {
-      res = await openPlanCheckout({
-        planKey: monthlyKey,
-        userId: user.id,
-        email: user.email,
-        afterSuccessNavigate: afterNav,
-      });
+    let res = await openDodoCheckout({ product: primary, userId: user.id, email: user.email, ...completedOpt });
+    if (!res.ok && res.reason === 'no_price' && displayedBilling) {
+      res = await openDodoCheckout({ product: monthlyKey, userId: user.id, email: user.email, ...completedOpt });
     }
-    if (!res.ok && res.reason === 'not_configured') {
-      console.warn('[checkout] not_configured', res.message);
-      toast.error(res.message);
+    if (!res.ok && (res.reason === 'no_dodo' || res.reason === 'no_price')) {
+      if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(primary);
         return;
       }
-      if (/please sign in/i.test(res.message)) {
-        navigate('/auth?mode=login&redirect=' + encodeURIComponent('/pricing'));
-      }
+      handleGetStarted();
       return;
     }
-    if (!res.ok) {
-      console.warn('[checkout]', res.reason, res.message);
-      toast.error(res.message);
-    }
-  }, [user, displayedBilling, navigate, afterNav, onCheckoutCompleted]);
+    if (!res.ok) toast.error(res.message);
+  }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
-    if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'));
-      return;
-    }
     if (user && !user.emailConfirmed) {
-      toast.error('Please verify your email before continuing to checkout.');
+      toast.error('Please verify your email before checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
       return;
     }
-    const checkoutUserId = user.id;
-    const checkoutEmail = user.email;
+    const checkoutUserId = user?.id ?? 'guest';
+    const checkoutEmail = user?.email;
     const gate = user ? assertPrelaunchCheckoutAllowed(user, 'bookworm') : { ok: true };
     if (!gate.ok) {
       setDupModal({ open: true, message: gate.message });
       return;
     }
-    const product: InternalPlanKey = displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly';
+    const product: CheckoutProductKey = displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly';
     if (import.meta.env.DEV) {
       onCheckoutCompleted?.(product);
       return;
     }
-    const res = await openPlanCheckout({
-      planKey: product,
+    const res = await openDodoCheckout({
+      product,
       userId: checkoutUserId,
       email: checkoutEmail,
-      afterSuccessNavigate: afterNav,
+      ...completedOpt,
     });
-    if (!res.ok && res.reason === 'not_configured') {
-      console.warn('[checkout] not_configured', res.message);
-      toast.error(res.message);
+    if (!res.ok && (res.reason === 'no_dodo' || res.reason === 'no_price')) {
+      if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(product);
         return;
       }
+      toast.error('Checkout is not configured yet.');
       return;
     }
-    if (!res.ok) {
-      console.warn('[checkout]', res.reason, res.message);
-      toast.error(res.message);
-    }
-  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate]);
+    if (!res.ok) toast.error(res.message);
+  }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
 
   const lockEarlySage = useCallback(async () => {
-    if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'));
-      return;
-    }
     if (user && !user.emailConfirmed) {
-      toast.error('Please verify your email before continuing to checkout.');
+      toast.error('Please verify your email before checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
       return;
     }
-    const checkoutUserId = user.id;
-    const checkoutEmail = user.email;
+    const checkoutUserId = user?.id ?? 'guest';
+    const checkoutEmail = user?.email;
     const gate = user ? assertPrelaunchCheckoutAllowed(user, 'sage') : { ok: true };
     if (!gate.ok) {
       setDupModal({ open: true, message: gate.message });
       return;
     }
-    const product: InternalPlanKey = displayedBilling ? 'sage_yearly' : 'sage_monthly';
+    const product: CheckoutProductKey = displayedBilling ? 'sage_yearly' : 'sage_monthly';
     if (import.meta.env.DEV) {
       onCheckoutCompleted?.(product);
       return;
     }
-    const res = await openPlanCheckout({
-      planKey: product,
+    const res = await openDodoCheckout({
+      product,
       userId: checkoutUserId,
       email: checkoutEmail,
-      afterSuccessNavigate: afterNav,
+      ...completedOpt,
     });
-    if (!res.ok && res.reason === 'not_configured') {
-      console.warn('[checkout] not_configured', res.message);
-      toast.error(res.message);
+    if (!res.ok && (res.reason === 'no_dodo' || res.reason === 'no_price')) {
+      if (import.meta.env.DEV) toast.message(res.message);
       if (onCheckoutCompleted) {
         onCheckoutCompleted(product);
         return;
       }
+      toast.error('Checkout is not configured yet.');
       return;
     }
-    if (!res.ok) {
-      console.warn('[checkout]', res.reason, res.message);
-      toast.error(res.message);
-    }
-  }, [user, displayedBilling, afterNav, onCheckoutCompleted, navigate]);
+    if (!res.ok) toast.error(res.message);
+  }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
 
   const claimGenesisSeatEarly = useCallback(() => {
     if (!user?.id) {
@@ -276,6 +240,11 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
       }}
     />
   );
+
+  const earlyBirdSoldOut = genesisInventory ? isEarlyBirdSoldOut(genesisInventory) : false;
+  const lifetimeEarlyId = getCheckoutProductId('lifetime_early_bird');
+  const lifetimeStandardId = getCheckoutProductId('lifetime_standard');
+  const lifetimePlusSageId = getCheckoutProductId('lifetime_plus_sage');
 
   if (earlyAccessPricing) {
     const seatsRemaining = lifetimeDealSeatsRemaining(genesisInventory);
@@ -545,12 +514,18 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
           <p className="mt-1">
             €80 tier — <strong className="text-white">{genesisInventory.genesis80.remaining}</strong> / {genesisInventory.genesis80.cap} left · €119 tier —{' '}
             <strong className="text-white">{genesisInventory.genesis119.remaining}</strong> / {genesisInventory.genesis119.cap} left
+            {genesisInventory.genesis176 ? (
+              <>
+                {' '}
+                · €176 bundle — <strong className="text-white">{genesisInventory.genesis176.remaining}</strong> left
+              </>
+            ) : null}
           </p>
         </div>
       ) : null}
 
       {!earlyAccessPricing ? (
-        <p className="mb-8 text-center text-xs text-white/45">Prices shown are tax-exclusive; applicable tax may appear at checkout.</p>
+        <p className="mb-8 text-center text-xs text-white/45">Prices shown are tax-exclusive; Dodo Payments shows tax before you pay.</p>
       ) : null}
 
       <div className="mb-12 flex flex-col items-center gap-3">
@@ -598,7 +573,8 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
         <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0} className="flex h-full min-h-0 flex-col">
           <div className="relative flex h-full min-h-0 flex-col rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#266ba7]/40 hover:shadow-[0_24px_48px_-12px_rgba(38,107,167,0.28)]">
             <div className="mb-6">
-              <h3 className="mb-1 text-2xl font-bold text-white">Bookworm</h3>
+              <h3 className="mb-1 text-2xl font-bold text-white">Basic</h3>
+              <p className="text-xs text-white/45">Same tier as Bookworm in-app</p>
             </div>
             <div
               className={`mb-6 transition-all duration-300 ease-out ${priceReveal ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
@@ -634,13 +610,23 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               ))}
             </ul>
             <div className="mt-auto pt-6">
-              <button
-                type="button"
-                onClick={() => void runCheckoutSubscription()}
-                className="w-full rounded-full bg-[#266ba7] py-3 font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/35 active:scale-[0.99]"
-              >
-                Choose Bookworm
-              </button>
+              {getCheckoutProductId(displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly') ? (
+                <CheckoutButton
+                  productId={getCheckoutProductId(displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly')!}
+                  productKind={displayedBilling ? 'bookworm_yearly' : 'bookworm_monthly'}
+                  label={displayedBilling ? 'Choose Basic (yearly)' : 'Choose Basic (monthly)'}
+                  duplicateGate="bookworm"
+                  className="w-full rounded-full bg-[#266ba7] py-3 font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/35 active:scale-[0.99]"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void runCheckoutSubscription()}
+                  className="w-full rounded-full bg-[#266ba7] py-3 font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/35 active:scale-[0.99]"
+                >
+                  Choose Basic
+                </button>
+              )}
             </div>
           </div>
         </ScrollReveal>
@@ -651,7 +637,8 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               Most Popular
             </div>
             <div className="mb-6">
-              <h3 className="mb-1 text-2xl font-bold text-white">Sage</h3>
+              <h3 className="mb-1 text-2xl font-bold text-white">Pro</h3>
+              <p className="text-xs text-white/50">Same tier as Sage in-app</p>
             </div>
             <div
               className={`mb-6 transition-all duration-300 ease-out ${priceReveal ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
@@ -687,13 +674,23 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               ))}
             </ul>
             <div className="mt-auto pt-6">
-              <button
-                type="button"
-                onClick={() => void runBibliophileCheckout()}
-                className="w-full rounded-full bg-white py-3 font-semibold text-[#266ba7] transition-all duration-200 hover:bg-white/95 hover:shadow-xl active:scale-[0.99]"
-              >
-                Upgrade to Sage
-              </button>
+              {getCheckoutProductId(displayedBilling ? 'sage_yearly' : 'sage_monthly') ? (
+                <CheckoutButton
+                  productId={getCheckoutProductId(displayedBilling ? 'sage_yearly' : 'sage_monthly')!}
+                  productKind={displayedBilling ? 'sage_yearly' : 'sage_monthly'}
+                  label={displayedBilling ? 'Upgrade to Sage (yearly)' : 'Upgrade to Sage (monthly)'}
+                  duplicateGate="sage"
+                  className="w-full rounded-full bg-white py-3 font-semibold text-[#266ba7] transition-all duration-200 hover:bg-white/95 hover:shadow-xl active:scale-[0.99]"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void runBibliophileCheckout()}
+                  className="w-full rounded-full bg-white py-3 font-semibold text-[#266ba7] transition-all duration-200 hover:bg-white/95 hover:shadow-xl active:scale-[0.99]"
+                >
+                  Upgrade to Pro
+                </button>
+              )}
             </div>
           </div>
         </ScrollReveal>
@@ -704,7 +701,8 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               Limited Offer
             </div>
             <div className="mb-6">
-              <h3 className="mb-1 text-2xl font-bold text-white">Genesis</h3>
+              <h3 className="mb-1 text-2xl font-bold text-white">Enterprise</h3>
+              <p className="text-xs text-white/45">Genesis lifetime program</p>
             </div>
             <div className="mb-6 space-y-2">
               <p className="text-xs text-white/50">One-time · tax-exclusive</p>
@@ -737,16 +735,48 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
                 </li>
               ))}
             </ul>
-            <div className="mt-auto flex flex-col gap-2 pt-6">
-              <button
-                type="button"
-                onClick={claimGenesisSeatEarly}
-                className="min-h-11 w-full rounded-full bg-[#266ba7] py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/30 active:scale-[0.99]"
-              >
-                Choose your Genesis package
-              </button>
+              <div className="mt-auto flex flex-col gap-2 pt-6">
+              {!earlyBirdSoldOut && lifetimeEarlyId ? (
+                <CheckoutButton
+                  productId={lifetimeEarlyId}
+                  productKind="lifetime_early_bird"
+                  label="Lifetime Early Bird — $80 (50 seats)"
+                  duplicateGate="genesis"
+                  requireEmailVerified
+                  className="min-h-11 w-full rounded-full bg-[#266ba7] py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/30 active:scale-[0.99]"
+                />
+              ) : null}
+              {lifetimeStandardId ? (
+                <CheckoutButton
+                  productId={lifetimeStandardId}
+                  productKind="lifetime_standard"
+                  label="Lifetime Standard — $119"
+                  duplicateGate="genesis"
+                  requireEmailVerified
+                  className="min-h-11 w-full rounded-full border border-white/20 bg-white/10 py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-white/15 active:scale-[0.99]"
+                />
+              ) : null}
+              {lifetimePlusSageId ? (
+                <CheckoutButton
+                  productId={lifetimePlusSageId}
+                  productKind="lifetime_plus_sage"
+                  label="Lifetime + 1 Year Sage — $176"
+                  duplicateGate="genesis"
+                  requireEmailVerified
+                  className="min-h-11 w-full rounded-full border border-[#7bbdf3]/40 bg-[#1a2f45]/80 py-3 text-base font-semibold text-[#7bbdf3] transition-all duration-200 hover:bg-[#1a2f45] active:scale-[0.99]"
+                />
+              ) : null}
+              {!lifetimeEarlyId && !lifetimeStandardId && !lifetimePlusSageId ? (
+                <button
+                  type="button"
+                  onClick={claimGenesisSeatEarly}
+                  className="min-h-11 w-full rounded-full bg-[#266ba7] py-3 text-base font-semibold text-white transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-lg hover:shadow-[#266ba7]/30 active:scale-[0.99]"
+                >
+                  Choose your Genesis package
+                </button>
+              ) : null}
               <p className="text-center text-xs text-white/45">
-                €80 or €119 tier is selected on the next screen based on remaining seats.
+                Early Bird hides automatically after 50 sales. Standard and bundle use separate checkout products.
               </p>
             </div>
           </div>
@@ -761,9 +791,9 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               <thead>
                 <tr className="border-b border-white/10 bg-[#1a2f45]/60">
                   <th className="px-4 py-3 font-semibold text-white/90">Feature</th>
-                  <th className="px-4 py-3 font-semibold text-white/90">Bookworm</th>
-                  <th className="px-4 py-3 font-semibold text-white/90">Sage</th>
-                  <th className="px-4 py-3 font-semibold text-white/90">Genesis</th>
+                  <th className="px-4 py-3 font-semibold text-white/90">Basic</th>
+                  <th className="px-4 py-3 font-semibold text-white/90">Pro</th>
+                  <th className="px-4 py-3 font-semibold text-white/90">Enterprise</th>
                 </tr>
               </thead>
               <tbody className="text-white/70">
@@ -785,7 +815,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
           </div>
 
           <p id="tax-note" className="mt-4 text-center text-xs text-white/40">
-            Tax (if any) is calculated at checkout from your billing location.
+            Tax (if any) is calculated by Dodo Payments at checkout from your billing location.
           </p>
         </>
       ) : null}

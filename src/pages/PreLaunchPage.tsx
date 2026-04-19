@@ -64,22 +64,11 @@ export function PreLaunchPage() {
               <div className="flex w-full flex-col items-stretch justify-center gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate(
-                      '/auth?mode=signup&redirect=' + encodeURIComponent('/early-access'),
-                    )
-                  }
+                  onClick={() => navigate('/early-access')}
                   className="group flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-[#266ba7] px-8 py-3.5 text-base font-semibold text-white transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#3b82c4] hover:shadow-xl hover:shadow-[#266ba7]/40 sm:w-auto sm:px-10 sm:py-4 sm:text-lg"
                 >
                   Sign up for Pre-Launch
                   <ArrowRight className="h-5 w-5 shrink-0 transition-transform duration-200 group-hover:translate-x-1" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/early-access')}
-                  className="min-h-11 w-full rounded-full border border-white/15 bg-transparent px-6 py-3 text-sm font-medium text-white/80 transition-all hover:border-[#7bbdf3]/40 hover:text-white sm:w-auto"
-                >
-                  Browse pre-launch pricing
                 </button>
               </div>
               <div className="mt-1 space-y-1 text-center text-xs leading-snug text-[#7bbdf3]/90 sm:text-sm">

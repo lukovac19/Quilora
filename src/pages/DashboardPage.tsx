@@ -59,10 +59,34 @@ export function DashboardPage() {
       return;
     }
     await quiloraEdgePostJson(`${QUILORA_EDGE_SLUG}/billing/cancel-prelaunch`, token, {});
-    showToast('Cancellation recorded. Refund completes via your payment provider.', 'success');
+    showToast('Cancellation recorded. Refund completes via Dodo Payments.', 'success');
     await refreshAuthUser();
     await refreshLaunchState();
   }, [showToast, refreshAuthUser, refreshLaunchState]);
+
+  const openBillingPortal = useCallback(async () => {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      showToast('Sign in again to manage billing.', 'error');
+      return;
+    }
+    try {
+      const res = await quiloraEdgePostJson<{ portalUrl?: string; error?: string }>(
+        `${QUILORA_EDGE_SLUG}/billing/dodo/customer-portal`,
+        token,
+        {},
+      );
+      const url = res.portalUrl?.trim();
+      if (!url) {
+        showToast(res.error || 'Billing portal is not available yet.', 'error');
+        return;
+      }
+      window.location.href = url;
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : 'Could not open billing portal.', 'error');
+    }
+  }, [showToast]);
 
   const cancelGenesisApi = useCallback(async () => {
     const { data: sess } = await supabase.auth.getSession();
@@ -352,6 +376,13 @@ export function DashboardPage() {
                 <div className="text-xs text-white/40">{dashboardSidebarPlanLabel(user)}</div>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => void openBillingPortal()}
+              className="mb-2 w-full rounded-2xl border border-white/10 bg-[#1a2f45]/50 px-4 py-2.5 text-left text-xs font-medium text-white/80 transition-colors hover:border-[#266ba7]/40 hover:text-white"
+            >
+              Manage subscription
+            </button>
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-2.5 rounded-2xl text-white/60 hover:text-white hover:bg-white/5 transition-all"

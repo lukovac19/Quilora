@@ -6,7 +6,6 @@ import { shouldBlockPreLaunchCanvas } from '../lib/preLaunchProductMode';
 const BILLING_EXEMPT_PREFIXES = [
   '/pricing',
   '/payments',
-  '/billing',
   '/early-access',
   '/early-access/genesis-choice',
   '/onboarding',

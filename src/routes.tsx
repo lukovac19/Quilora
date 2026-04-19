@@ -47,6 +47,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { FeaturesPage } from "./pages/FeaturesPage";
 import { HowItWorksPage } from "./pages/HowItWorksPage";
 import { PricingPage } from "./pages/PricingPage";
+import { CheckoutSuccessPage } from "./pages/CheckoutSuccessPage";
 import { FAQPage } from "./pages/FAQPage";
 import { AboutPage } from "./pages/AboutPage";
 import { BlogPage } from "./pages/BlogPage";
@@ -64,15 +65,13 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardFrame2 } from "./pages/DashboardFrame2";
 import { SandboxLoadingFrame } from "./pages/SandboxLoadingFrame";
 import { AiRagDebugPage } from "./pages/AiRagDebugPage";
-import { BillingSuccessPage } from "./pages/BillingSuccessPage";
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: RootLayout,
     errorElement: <RouteErrorFallback />,
     children: [
-      { index: true, Component: PreLaunchPage },
-      { path: "landing", Component: QuiloraLandingPage },
+      { index: true, Component: QuiloraLandingPage },
       {
         path: "early-access/genesis-welcome",
         element: <Navigate to="/early-access" replace />,
@@ -88,7 +87,7 @@ export const router = createBrowserRouter([
       { path: "early-access", Component: PreLaunchEarlyAccessPage },
       { path: "early-access/promises", Component: PrelaunchPromisesPage },
       { path: "home", Component: QuiloraLandingPage },
-      { path: "pre-launch", element: <Navigate to="/" replace /> },
+      { path: "pre-launch", Component: PreLaunchPage },
       { path: "pre-launch/early-access", element: <Navigate to="/early-access" replace /> },
       { 
         path: "auth", 
@@ -119,10 +118,10 @@ export const router = createBrowserRouter([
         Component: PricingPage 
       },
       {
-        path: "billing/success",
+        path: "checkout/success",
         element: (
           <ProtectedRoute>
-            <BillingSuccessPage />
+            <CheckoutSuccessPage />
           </ProtectedRoute>
         ),
       },

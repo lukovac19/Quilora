@@ -17,9 +17,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import { QUILORA_EDGE_SLUG, quiloraEdgePostJson } from '../lib/quiloraEdge';
 import { supabase } from '../lib/supabase';
-import { toast } from 'sonner@2.0.3';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 
 function weakPasswordMsg(password: string): string | null {
@@ -32,7 +30,7 @@ function weakPasswordMsg(password: string): string | null {
 
 const TIER_LABEL: Record<string, string> = {
   bookworm: 'Bookworm',
-  bibliophile: 'Sage',
+  bibliophile: 'Bibliophile',
   genesis: 'Genesis',
 };
 
@@ -55,7 +53,6 @@ export function SettingsPage() {
   const [pwdError, setPwdError] = useState('');
   const [pwdSuccess, setPwdSuccess] = useState(false);
   const [pwdBusy, setPwdBusy] = useState(false);
-  const [portalBusy, setPortalBusy] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,37 +78,6 @@ export function SettingsPage() {
     });
     if (!error) {
       setUser({ ...user, emailProductTips: tips, emailStudyReminders: reminders });
-    }
-  };
-
-  const openBillingPortal = async () => {
-    if (!user) return;
-    setPortalBusy(true);
-    try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) {
-        toast.error('Please sign in again.');
-        return;
-      }
-      // After Polar portal session — user returns here. Production: ensure origin matches your deployed app (see TODO_APP_URL / VITE_APP_URL for checkout consistency).
-      const returnUrl = `${window.location.origin}/settings`;
-      const res = await quiloraEdgePostJson<{ customerPortalUrl?: string; error?: string }>(
-        `${QUILORA_EDGE_SLUG}/billing/customer-portal`,
-        token,
-        { returnUrl },
-      );
-      if (res.customerPortalUrl) {
-        window.location.href = res.customerPortalUrl;
-        return;
-      }
-      toast.error(res.error ?? 'Billing portal is unavailable for this account.');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not open billing portal.');
-    } finally {
-      setPortalBusy(false);
     }
   };
 
@@ -287,16 +253,6 @@ export function SettingsPage() {
                   <span className="text-white/40">Credits</span>{' '}
                   <span className="font-semibold text-[#7bbdf3]">{credits}</span>
                 </p>
-                <div className="pt-2">
-                  <button
-                    type="button"
-                    disabled={portalBusy}
-                    onClick={() => void openBillingPortal()}
-                    className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10 disabled:opacity-50"
-                  >
-                    {portalBusy ? 'Opening…' : 'Manage billing'}
-                  </button>
-                </div>
               </div>
             </div>
 

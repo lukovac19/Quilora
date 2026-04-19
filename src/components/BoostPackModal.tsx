@@ -1,6 +1,6 @@
 import { X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { openPlanCheckout } from '../lib/billingCheckout';
+import { openDodoCheckout } from '../lib/billingCheckout';
 import { useApp } from '../context/AppContext';
 
 type Props = {
@@ -8,7 +8,7 @@ type Props = {
   onClose: () => void;
 };
 
-/** EP-02 Boost Pack Modal — $1.99 = 200 credits (confirmed by billing webhooks before balance updates). */
+/** EP-02 Boost Pack Modal — $1.99 = 200 credits (Dodo confirms before balance updates). */
 export function BoostPackModal({ open, onClose }: Props) {
   const { user } = useApp();
 
@@ -20,8 +20,8 @@ export function BoostPackModal({ open, onClose }: Props) {
       onClose();
       return;
     }
-    const res = await openPlanCheckout({
-      planKey: 'boost_pack',
+    const res = await openDodoCheckout({
+      product: 'boost_pack',
       userId: user.id,
       email: user.email,
     });
@@ -30,7 +30,7 @@ export function BoostPackModal({ open, onClose }: Props) {
       onClose();
       return;
     }
-    if (res.reason === 'not_configured') {
+    if (res.reason === 'no_dodo' || res.reason === 'no_price') {
       if (import.meta.env.DEV) toast.message(res.message);
       else toast.error('Checkout is not configured.');
       return;
@@ -50,7 +50,7 @@ export function BoostPackModal({ open, onClose }: Props) {
         <p id="boost-price-display" className="mt-3 text-lg font-semibold text-[#7bbdf3]">
           $1.99 — 200 credits
         </p>
-        <p className="mt-3 text-sm leading-relaxed text-white/65">One-time top-up. Credits appear in your balance after payment completes.</p>
+        <p className="mt-3 text-sm leading-relaxed text-white/65">One-time top-up via Dodo Payments. Credits appear in your balance after payment completes.</p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             id="confirm-purchase-btn"
