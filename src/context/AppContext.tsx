@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { computeBillingGatePassed } from '../lib/billingGate';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson } from '../lib/quiloraEdge';
@@ -100,7 +101,7 @@ interface AppContextType {
   logout: () => Promise<void>;
   authLoading: boolean;
   /** Re-fetch session + profile (e.g. after email verification). Returns the hydrated user. */
-  refreshAuthUser: () => Promise<User | null>;
+  refreshAuthUser: (knownSession?: Session) => Promise<User | null>;
   /** From Edge `billing/app-state` — when true, Phase 5 canvas unlock is live. */
   publicLaunchComplete: boolean | null;
   refreshLaunchState: () => Promise<void>;
@@ -142,13 +143,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void refreshLaunchState();
   }, [refreshLaunchState]);
 
-  const hydrateFromSession = useCallback(async (): Promise<User | null> => {
-    if (hydrateInFlightRef.current) {
+  /**
+   * When `knownSession` is passed (e.g. right after `signInWithPassword`), skip `getSession()` and do not wait on
+   * `hydrateInFlightRef`. Otherwise a hydrate kicked from `onAuthStateChange` during the same sign-in tick can sit
+   * behind a stuck `getSession()`/lock and block `refreshAuthUser()` forever (Auth button stays on “Please wait…”).
+   */
+  const hydrateFromSession = useCallback(async (knownSession?: Session): Promise<User | null> => {
+    const useKnownSession = knownSession !== undefined;
+    if (!useKnownSession && hydrateInFlightRef.current) {
       return hydrateInFlightRef.current;
     }
     const run = (async (): Promise<User | null> => {
     try {
       let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
+      if (useKnownSession) {
+        session = knownSession;
+      } else {
       try {
         const { data, error: sessionError } = await withTimeout(supabase.auth.getSession(), 20000, 'auth.getSession');
         if (sessionError) {
@@ -159,8 +169,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         session = data.session;
       } catch (e) {
         console.error('[auth] getSession failed', e);
-        setUser(null);
+        // Do not clear user on timeout/race: a parallel hydrate may have just applied a fresh session from sign-in.
         return null;
+      }
       }
 
       if (!session?.user) {
@@ -251,15 +262,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return null;
     } finally {
       setAuthLoading(false);
-      hydrateInFlightRef.current = null;
+      if (!useKnownSession) {
+        hydrateInFlightRef.current = null;
+      }
     }
     })();
-    hydrateInFlightRef.current = run;
+    if (!useKnownSession) {
+      hydrateInFlightRef.current = run;
+    }
     return run;
   }, []);
 
-  const refreshAuthUser = useCallback(async () => {
-    return await hydrateFromSession();
+  const refreshAuthUser = useCallback(async (knownSession?: Session) => {
+    return await hydrateFromSession(knownSession);
   }, [hydrateFromSession]);
 
   useEffect(() => {
@@ -500,7 +515,7 @@ export function useApp() {
       questionsRemaining: 5,
       logout: async () => {},
       authLoading: false,
-      refreshAuthUser: async () => null,
+      refreshAuthUser: async (_?: Session) => null,
       publicLaunchComplete: null,
       refreshLaunchState: async () => {},
     };

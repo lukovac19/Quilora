@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type CSSProperties, type Form
 import { useNavigate, useSearchParams } from 'react-router';
 import { useApp, type User } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { withTimeout } from '../lib/promiseTimeout';
 import { Mail, Lock, X, Sparkles, LayoutGrid, BrainCircuit, Highlighter } from 'lucide-react';
@@ -290,7 +291,11 @@ export function AuthPage() {
       setExistingSessionEmail(null);
       let hydrated: User | null = null;
       try {
-        hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+        hydrated = await withTimeout(
+          refreshAuthUser(session as Session),
+          PROFILE_REFRESH_TIMEOUT_MS,
+          'Load profile',
+        );
       } catch {
         hydrated = null;
       }
@@ -298,7 +303,7 @@ export function AuthPage() {
       const navUser = hydrated ?? mapSessionToUser(session.user);
       if (!hydrated) {
         setUser(mapSessionToUser(session.user));
-        void refreshAuthUser();
+        void refreshAuthUser(session as Session);
       }
       const redirect = safeInternalPath(new URLSearchParams(window.location.search).get('redirect'));
       if (navUser.emailConfirmed && !navUser.billingGatePassed) {
@@ -333,14 +338,18 @@ export function AuthPage() {
         void (async () => {
           let hydrated: User | null = null;
           try {
-            hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+            hydrated = await withTimeout(
+              refreshAuthUser(session as Session),
+              PROFILE_REFRESH_TIMEOUT_MS,
+              'Load profile',
+            );
           } catch {
             hydrated = null;
           }
           const navUser = hydrated ?? mapSessionToUser(session.user);
           if (!hydrated) {
             setUser(mapSessionToUser(session.user));
-            void refreshAuthUser();
+            void refreshAuthUser(session as Session);
           }
           setExistingSessionEmail(null);
           const redirect = safeInternalPath(new URLSearchParams(window.location.search).get('redirect'));
@@ -467,13 +476,17 @@ export function AuthPage() {
           }
           let hydrated: User | null = null;
           try {
-            hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
+            hydrated = await withTimeout(
+              refreshAuthUser(data.session as Session),
+              PROFILE_REFRESH_TIMEOUT_MS,
+              'Load profile',
+            );
           } catch {
             hydrated = null;
           }
           if (!hydrated) {
             setUser(mapSessionToUser(u));
-            void refreshAuthUser();
+            void refreshAuthUser(data.session as Session);
           }
           const navUser = hydrated ?? mapSessionToUser(u);
           showToast(hydrated ? 'Welcome to Quilora!' : 'Welcome — loading your profile…', hydrated ? 'success' : 'info');
@@ -489,6 +502,7 @@ export function AuthPage() {
             setLoading(false);
             return;
           }
+          setLoading(false);
           navigate(redirect ?? '/dashboard', { replace: true });
         } else {
           setSignUpPendingVerify(true);
@@ -517,40 +531,51 @@ export function AuthPage() {
           'Log in',
         );
         if (signInError) throw signInError;
-        if (data.user) {
-          if (!data.user.email_confirmed_at) {
-            setUser(mapSessionToUser(data.user));
-            showToast('Please verify your email to continue.', 'info');
-            navigate('/auth/verify-email', { replace: true });
-            setLoading(false);
-            return;
-          }
-          let hydrated: User | null = null;
-          try {
-            hydrated = await withTimeout(refreshAuthUser(), PROFILE_REFRESH_TIMEOUT_MS, 'Load profile');
-          } catch {
-            hydrated = null;
-          }
-          if (!hydrated) {
-            setUser(mapSessionToUser(data.user));
-            void refreshAuthUser();
-          }
-          const navUser = hydrated ?? mapSessionToUser(data.user);
-          showToast(hydrated ? 'Logged in successfully!' : 'Logged in — finishing setup…', hydrated ? 'success' : 'info');
-          const redirect = safeInternalPath(searchParams.get('redirect'));
-          if (!navUser.billingGatePassed) {
-            if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
-              markGenesisChoiceFlowPending();
-              navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
-              setLoading(false);
-              return;
-            }
-            navigate(`/early-access${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''}`, { replace: true });
-            setLoading(false);
-            return;
-          }
-          navigate(redirect ?? '/dashboard', { replace: true });
+        const authUser = data.user ?? data.session?.user ?? null;
+        if (!authUser) {
+          setError('Sign-in returned no user. Please try again.');
+          return;
         }
+        if (!authUser.email_confirmed_at) {
+          setUser(mapSessionToUser(authUser));
+          showToast('Please verify your email to continue.', 'info');
+          navigate('/auth/verify-email', { replace: true });
+          setLoading(false);
+          return;
+        }
+        const sessionForHydrate = (data.session ?? null) as Session | null;
+        let hydrated: User | null = null;
+        try {
+          hydrated = await withTimeout(
+            sessionForHydrate
+              ? refreshAuthUser(sessionForHydrate)
+              : refreshAuthUser(),
+            PROFILE_REFRESH_TIMEOUT_MS,
+            'Load profile',
+          );
+        } catch {
+          hydrated = null;
+        }
+        if (!hydrated) {
+          setUser(mapSessionToUser(authUser));
+          void (sessionForHydrate ? refreshAuthUser(sessionForHydrate) : refreshAuthUser());
+        }
+        const navUser = hydrated ?? mapSessionToUser(authUser);
+        showToast(hydrated ? 'Logged in successfully!' : 'Logged in — finishing setup…', hydrated ? 'success' : 'info');
+        const redirect = safeInternalPath(searchParams.get('redirect'));
+        if (!navUser.billingGatePassed) {
+          if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
+            markGenesisChoiceFlowPending();
+            navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
+            setLoading(false);
+            return;
+          }
+          navigate(`/early-access${redirect ? `?redirect=${encodeURIComponent(redirect)}` : ''}`, { replace: true });
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
+        navigate(redirect ?? '/dashboard', { replace: true });
       } else if (mode === 'forgot') {
         const { error: resetError } = await withTimeout(
           supabase.auth.resetPasswordForEmail(email, {
