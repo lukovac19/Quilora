@@ -3,12 +3,16 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useApp, type User } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { supabase } from '../lib/supabase';
+import { withTimeout } from '../lib/promiseTimeout';
 import { Mail, Lock, X, Sparkles, LayoutGrid, BrainCircuit, Highlighter } from 'lucide-react';
 import { ModernNavbar } from '../components/ModernNavbar';
 import { safeInternalPath } from '../lib/safeInternalPath';
 import { markGenesisChoiceFlowPending } from '../lib/genesisEarlyAccessSession';
 
 const GENESIS_CHOICE_REDIRECT_PATH = '/early-access/genesis-choice';
+
+/** Prevents “Please wait…” forever if the Auth API never returns (network / stalled request). */
+const AUTH_REQUEST_TIMEOUT_MS = 45000;
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
@@ -31,6 +35,9 @@ function isDuplicateEmailError(err: unknown): boolean {
 /** Supabase often returns this when Auth email (SMTP / built-in) is not configured or confirm-email flow fails. */
 function formatAuthProviderHint(message: string): string {
   const lower = message.toLowerCase();
+  if (lower.includes('timed out')) {
+    return `${message}\n\nCheck your connection. If it keeps happening, confirm the Supabase project is not paused (Dashboard → Project settings) and that VITE_SUPABASE_* env values match the project.`;
+  }
   const emailFix =
     'U Supabase Dashboard: Authentication → Providers → Email — za lokalni test isključi „Confirm email“, ili uključi Custom SMTP. Pogledaj i Logs → Auth za tačan uzrok.';
   if (
@@ -373,7 +380,11 @@ export function AuthPage() {
           setLoading(false);
           return;
         }
-        const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+        const { error: updateError } = await withTimeout(
+          supabase.auth.updateUser({ password: newPassword }),
+          AUTH_REQUEST_TIMEOUT_MS,
+          'Update password',
+        );
         if (updateError) throw updateError;
         showToast('Password updated. Sign in with your new password.', 'success');
         recoveryRef.current = false;
@@ -399,13 +410,17 @@ export function AuthPage() {
           setLoading(false);
           return;
         }
-        const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: authRedirectUrl,
-          },
-        });
+        const { data, error: signUpError } = await withTimeout(
+          supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              emailRedirectTo: authRedirectUrl,
+            },
+          }),
+          AUTH_REQUEST_TIMEOUT_MS,
+          'Sign up',
+        );
         if (signUpError) {
           if (isDuplicateEmailError(signUpError)) {
             setDuplicateEmailError(true);
@@ -463,10 +478,14 @@ export function AuthPage() {
           showToast('Check your email to confirm your account.', 'success');
         }
       } else if (mode === 'login') {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { data, error: signInError } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          AUTH_REQUEST_TIMEOUT_MS,
+          'Log in',
+        );
         if (signInError) throw signInError;
         if (data.user) {
           if (!data.user.email_confirmed_at) {
@@ -497,9 +516,13 @@ export function AuthPage() {
           navigate(redirect ?? '/dashboard', { replace: true });
         }
       } else if (mode === 'forgot') {
-        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: authRedirectUrl,
-        });
+        const { error: resetError } = await withTimeout(
+          supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: authRedirectUrl,
+          }),
+          AUTH_REQUEST_TIMEOUT_MS,
+          'Password reset email',
+        );
         if (resetError) throw resetError;
         setForgotEmailSent(true);
         showToast('If an account exists, you will receive a reset link shortly.', 'success');

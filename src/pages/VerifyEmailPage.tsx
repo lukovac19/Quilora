@@ -32,32 +32,37 @@ export function VerifyEmailPage() {
   const autoResentOnceRef = useRef(false);
 
   const refreshSession = useCallback(async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user) {
-      navigate('/auth?mode=login', { replace: true });
-      return;
-    }
-    if (session.user.email_confirmed_at) {
-      await supabase.auth.refreshSession();
-      const hydrated = await refreshAuthUser();
-      if (hydrated && !hydrated.billingGatePassed) {
-        const redirect =
-          safeInternalPath(new URLSearchParams(window.location.search).get('redirect')) ?? '/dashboard';
-        if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
-          markGenesisChoiceFlowPending();
-          navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
-          return;
-        }
-        navigate(`/early-access?redirect=${encodeURIComponent(redirect)}`, { replace: true });
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user) {
+        navigate('/auth?mode=login', { replace: true });
         return;
       }
-      navigate('/dashboard', { replace: true });
-      return;
+      if (session.user.email_confirmed_at) {
+        await supabase.auth.refreshSession();
+        const hydrated = await refreshAuthUser();
+        if (hydrated && !hydrated.billingGatePassed) {
+          const redirect =
+            safeInternalPath(new URLSearchParams(window.location.search).get('redirect')) ?? '/dashboard';
+          if (redirect === GENESIS_CHOICE_REDIRECT_PATH) {
+            markGenesisChoiceFlowPending();
+            navigate(GENESIS_CHOICE_REDIRECT_PATH, { replace: true });
+            return;
+          }
+          navigate(`/early-access?redirect=${encodeURIComponent(redirect)}`, { replace: true });
+          return;
+        }
+        navigate('/dashboard', { replace: true });
+        return;
+      }
+      setEmail(session.user.email ?? '');
+    } catch (e) {
+      console.error('[verify-email] refreshSession', e);
+    } finally {
+      setLoading(false);
     }
-    setEmail(session.user.email ?? '');
-    setLoading(false);
   }, [navigate, refreshAuthUser]);
 
   useEffect(() => {

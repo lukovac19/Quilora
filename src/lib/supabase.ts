@@ -22,5 +22,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
     /** Hosted Supabase Auth expects PKCE for OAuth / URL callbacks; implicit flow can break at `*.supabase.co/auth/v1/authorize`. */
     flowType: 'pkce',
+    /**
+     * Email confirmation and SMTP are project settings (Dashboard → Authentication → Providers / SMTP),
+     * not client options. If confirm email is on but SMTP is not configured, signup can fail or emails won’t send.
+     */
   },
 });

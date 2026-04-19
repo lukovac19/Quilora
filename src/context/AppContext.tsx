@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { computeBillingGatePassed } from '../lib/billingGate';
 import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson } from '../lib/quiloraEdge';
 import { registerPostCheckoutWebhookDelayWatch } from '../lib/postCheckoutWebhookDelayWatch';
+import { withTimeout } from '../lib/promiseTimeout';
 
 type Language = 'en' | 'bs' | 'es';
 type Theme = 'dark' | 'light';
@@ -137,73 +138,125 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [refreshLaunchState]);
 
   const hydrateFromSession = useCallback(async (): Promise<User | null> => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session?.user) {
+    try {
+      let session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
+      try {
+        const { data, error: sessionError } = await withTimeout(supabase.auth.getSession(), 20000, 'auth.getSession');
+        if (sessionError) {
+          console.error('[auth] getSession', sessionError);
+          setUser(null);
+          return null;
+        }
+        session = data.session;
+      } catch (e) {
+        console.error('[auth] getSession failed', e);
+        setUser(null);
+        return null;
+      }
+
+      if (!session?.user) {
+        setUser(null);
+        return null;
+      }
+      const u = session.user;
+
+      type ProfileRow = {
+        full_name?: string | null;
+        email?: string | null;
+        tier?: string | null;
+        credit_balance?: number | null;
+        streak_count?: number | null;
+        streak_goal?: number | null;
+        avatar_url?: string | null;
+        genesis_badge?: boolean | null;
+        plan_selection_completed?: boolean | null;
+      } | null;
+
+      let profile: ProfileRow = null;
+      let activeSubCount = 0;
+
+      try {
+        const [profileRes, subRes] = await withTimeout(
+          Promise.all([
+            supabase
+              .from('profiles')
+              .select(
+                'full_name, email, tier, credit_balance, streak_count, streak_goal, avatar_url, genesis_badge, plan_selection_completed',
+              )
+              .eq('id', u.id)
+              .maybeSingle(),
+            supabase
+              .from('subscriptions')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', u.id)
+              .eq('status', 'active'),
+          ]),
+          25000,
+          'profiles and subscriptions',
+        );
+        if (profileRes.error) {
+          console.error('[auth] profiles select', profileRes.error);
+        } else {
+          profile = profileRes.data as ProfileRow;
+        }
+        if (subRes.error) {
+          console.error('[auth] subscriptions count', subRes.error);
+        } else {
+          activeSubCount = subRes.count ?? 0;
+        }
+      } catch (e) {
+        console.error('[auth] profile/subscription load', e);
+      }
+
+      const meta = u.user_metadata as {
+        name?: string;
+        email_product_tips?: boolean;
+        email_study_reminders?: boolean;
+      } | undefined;
+      const displayName =
+        (profile?.full_name as string | undefined)?.trim() ||
+        meta?.name ||
+        (u.email ?? '').split('@')[0] ||
+        'Reader';
+      const rawTier = profile?.tier as string | undefined;
+      const profileTier: QuiloraProfileTier =
+        rawTier === 'bibliophile' || rawTier === 'genesis' ? rawTier : 'bookworm';
+      const emailConfirmed = Boolean(u.email_confirmed_at);
+      const planSelectionCompleted = Boolean(profile?.plan_selection_completed);
+      const hasActivePaidSubscription = activeSubCount > 0;
+      const billingGatePassed = computeBillingGatePassed({
+        profileTier,
+        planSelectionCompleted,
+        hasActivePaidSubscription,
+      });
+      const userObj: User = {
+        id: u.id,
+        email: u.email ?? (profile?.email as string) ?? '',
+        name: displayName,
+        subscriptionTier: mapProfileTierToSubscription(profile?.tier as string | undefined),
+        questionsAsked: 0,
+        lastQuestionTime: null,
+        cooldownUntil: null,
+        creditBalance: Number(profile?.credit_balance ?? 0),
+        streakCount: Number(profile?.streak_count ?? 0),
+        streakGoal: Number(profile?.streak_goal ?? 1),
+        emailConfirmed,
+        avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
+        profileTier,
+        genesisBadge: Boolean(profile?.genesis_badge),
+        emailProductTips: meta?.email_product_tips !== false,
+        emailStudyReminders: meta?.email_study_reminders !== false,
+        billingGatePassed,
+      };
+      setUser(userObj);
+      return userObj;
+    } catch (e) {
+      console.error('[auth] hydrateFromSession', e);
       setUser(null);
-      setAuthLoading(false);
       return null;
+    } finally {
+      setAuthLoading(false);
     }
-    const u = session.user;
-    const [{ data: profile }, subCountRes] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select(
-          'full_name, email, tier, credit_balance, streak_count, streak_goal, avatar_url, genesis_badge, plan_selection_completed',
-        )
-        .eq('id', u.id)
-        .maybeSingle(),
-      supabase
-        .from('subscriptions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', u.id)
-        .eq('status', 'active'),
-    ]);
-    const activeSubCount = subCountRes.count;
-    const meta = u.user_metadata as {
-      name?: string;
-      email_product_tips?: boolean;
-      email_study_reminders?: boolean;
-    } | undefined;
-    const displayName =
-      (profile?.full_name as string | undefined)?.trim() ||
-      meta?.name ||
-      (u.email ?? '').split('@')[0] ||
-      'Reader';
-    const rawTier = profile?.tier as string | undefined;
-    const profileTier: QuiloraProfileTier =
-      rawTier === 'bibliophile' || rawTier === 'genesis' ? rawTier : 'bookworm';
-    const emailConfirmed = Boolean(u.email_confirmed_at);
-    const planSelectionCompleted = Boolean((profile as { plan_selection_completed?: boolean } | null)?.plan_selection_completed);
-    const hasActivePaidSubscription = (activeSubCount ?? 0) > 0;
-    const billingGatePassed = computeBillingGatePassed({
-      profileTier,
-      planSelectionCompleted,
-      hasActivePaidSubscription,
-    });
-    const userObj: User = {
-      id: u.id,
-      email: u.email ?? (profile?.email as string) ?? '',
-      name: displayName,
-      subscriptionTier: mapProfileTierToSubscription(profile?.tier as string | undefined),
-      questionsAsked: 0,
-      lastQuestionTime: null,
-      cooldownUntil: null,
-      creditBalance: Number(profile?.credit_balance ?? 0),
-      streakCount: Number(profile?.streak_count ?? 0),
-      streakGoal: Number(profile?.streak_goal ?? 1),
-      emailConfirmed,
-      avatarUrl: (profile?.avatar_url as string | null | undefined) ?? null,
-      profileTier,
-      genesisBadge: Boolean(profile?.genesis_badge),
-      emailProductTips: meta?.email_product_tips !== false,
-      emailStudyReminders: meta?.email_study_reminders !== false,
-      billingGatePassed,
-    };
-    setUser(userObj);
-    setAuthLoading(false);
-    return userObj;
   }, []);
 
   const refreshAuthUser = useCallback(async () => {
