@@ -173,37 +173,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let activeSubCount = 0;
 
       try {
-        const [profileRes, subRes] = await withTimeout(
-          Promise.all([
-            supabase.from('profiles').select('*').eq('id', u.id).maybeSingle(),
-            supabase
-              .from('subscriptions')
-              .select('*', { count: 'exact', head: true })
-              .eq('user_id', u.id)
-              .eq('status', 'active'),
-          ]),
+        const profileRes = await withTimeout(
+          supabase.from('profiles').select('*').eq('id', u.id).maybeSingle(),
           25000,
-          'profiles and subscriptions',
+          'profiles',
         );
         if (profileRes.error) {
           console.error('[auth] profiles select', profileRes.error);
         } else {
           profile = normalizeProfileRow(profileRes.data as Record<string, unknown> | null);
         }
-        if (!subRes.error) {
-          activeSubCount = subRes.count ?? 0;
-        } else {
-          console.warn('[auth] subscriptions table unavailable, trying user_plans:', subRes.error.message);
-          const upRes = await supabase
+
+        /** Canonical paid state for pre-launch: `user_plans` (avoids 404 when `subscriptions` not deployed). */
+        const upRes = await withTimeout(
+          supabase
             .from('user_plans')
             .select('plan, subscription_status, is_lifetime')
             .eq('user_id', u.id)
-            .maybeSingle();
-          if (upRes.error) {
-            console.warn('[auth] user_plans:', upRes.error.message);
-          } else if (upRes.data && paidFromUserPlansRow(upRes.data)) {
-            activeSubCount = 1;
-          }
+            .maybeSingle(),
+          25000,
+          'user_plans',
+        );
+        if (upRes.error) {
+          console.warn('[auth] user_plans', upRes.error.message);
+        } else if (upRes.data && paidFromUserPlansRow(upRes.data)) {
+          activeSubCount = 1;
         }
       } catch (e) {
         console.error('[auth] profile/subscription load', e);

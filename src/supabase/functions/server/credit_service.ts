@@ -94,7 +94,7 @@ export async function ensureBillingState(admin: SupabaseClient, userId: string) 
 
 export async function getLowBalanceStatus(admin: SupabaseClient, userId: string) {
   const row = await getProfile(admin, userId);
-  const balance = Number(row?.credit_balance ?? 0);
+  const balance = Number(row?.credit_balance ?? row?.credits ?? 0);
   return {
     balance,
     threshold: CREDIT_RULES.lowBalanceThreshold,
@@ -110,7 +110,7 @@ export async function getTierEntitlements(admin: SupabaseClient, userId: string)
     maxSandboxes: TIER_LIMITS[tier].maxSandboxes,
     monthlyCredits: TIER_LIMITS[tier].monthlyCredits,
     rolloverEnabled: tier === 'bibliophile',
-    genesisBadge: Boolean(row?.genesis_badge),
+    genesisBadge: Boolean(row?.genesis_badge ?? row?.genesis),
     alphaLabAccess: Boolean(row?.alpha_lab_access),
     lowBalanceThreshold: CREDIT_RULES.lowBalanceThreshold,
   };

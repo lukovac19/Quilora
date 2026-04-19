@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { supabase } from '../lib/supabase';
+import { updateProfileDisplayName } from '../lib/profileClientUpdate';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 
 function weakPasswordMsg(password: string): string | null {
@@ -84,10 +85,8 @@ export function SettingsPage() {
   const handleSaveProfile = async () => {
     if (!user) return;
     try {
-      await supabase
-        .from('profiles')
-        .update({ full_name: name.trim(), updated_at: new Date().toISOString() })
-        .eq('id', user.id);
+      const r = await updateProfileDisplayName(user.id, name);
+      if (!r.ok) throw new Error(r.message ?? 'Profile update failed');
       await supabase.auth.updateUser({ data: { name: name.trim() } });
       setLanguage(draftLang);
       setUser({ ...user, name: name.trim() || user.name });

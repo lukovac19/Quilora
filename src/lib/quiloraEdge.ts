@@ -2,7 +2,23 @@ import { resolveSupabaseAnonKeyForClient, resolveSupabaseProjectId } from '../ut
 
 export const QUILORA_EDGE_SLUG = 'make-server-5a3d4811';
 
+const DEFAULT_EDGE_TIMEOUT_MS = 45_000;
+
 const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
 
 /** Single system prompt for canvas, tutor, and edge — answers about the user's book/PDF from provided text. */
 export const QUILORA_BOOK_ASSISTANT_SYSTEM = `You are Quilora, an expert reading companion. The user is studying a book or PDF; their message may include long excerpts from the document—treat that as the only ground truth when present.
@@ -25,7 +41,16 @@ export async function quiloraEdgeGetJson<T>(relativePath: string, accessToken?: 
   const url = new URL(relativePath.replace(/^\//, ''), `${quiloraFunctionsBaseUrl()}/`);
   const headers: Record<string, string> = { apikey: resolveSupabaseAnonKeyForClient() };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-  const res = await fetch(url.href, { method: 'GET', headers });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(url.href, { method: 'GET', headers }, DEFAULT_EDGE_TIMEOUT_MS);
+  } catch (e: unknown) {
+    const aborted =
+      (typeof e === 'object' && e !== null && 'name' in e && (e as { name?: string }).name === 'AbortError') ||
+      (e instanceof Error && /abort/i.test(e.message));
+    if (aborted) throw new Error('Request timed out — check your connection and try again.');
+    throw e;
+  }
   const ct = (res.headers.get('content-type') || '').toLowerCase();
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
@@ -50,15 +75,28 @@ export async function quiloraEdgeGetJson<T>(relativePath: string, accessToken?: 
 
 export async function quiloraEdgePostJson<T>(relativePath: string, accessToken: string, jsonBody: unknown): Promise<T> {
   const url = new URL(relativePath.replace(/^\//, ''), `${quiloraFunctionsBaseUrl()}/`);
-  const res = await fetch(url.href, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: resolveSupabaseAnonKeyForClient(),
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify(jsonBody),
-  });
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      url.href,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: resolveSupabaseAnonKeyForClient(),
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(jsonBody),
+      },
+      DEFAULT_EDGE_TIMEOUT_MS,
+    );
+  } catch (e: unknown) {
+    const aborted =
+      (typeof e === 'object' && e !== null && 'name' in e && (e as { name?: string }).name === 'AbortError') ||
+      (e instanceof Error && /abort/i.test(e.message));
+    if (aborted) throw new Error('Request timed out — check your connection and try again.');
+    throw e;
+  }
   const ct = (res.headers.get('content-type') || '').toLowerCase();
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;

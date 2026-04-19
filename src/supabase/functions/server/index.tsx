@@ -942,9 +942,11 @@ app.post('/make-server-5a3d4811/billing/dodo/checkout-session', async (c) => {
     const productId = String(body.productId ?? '').trim();
     if (!productId) return c.json({ error: 'Missing productId' }, 400);
 
-    const { data: prof } = await supabase.from('profiles').select('email, full_name').eq('id', userId).maybeSingle();
-    const email = (prof?.email as string | undefined) ?? null;
-    const fullName = (prof?.full_name as string | undefined)?.trim() || null;
+    const { data: prof } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    const pr = prof as Record<string, unknown> | null;
+    const email = (pr?.email as string | undefined) ?? null;
+    const rawName = (pr?.full_name ?? pr?.display_name) as string | undefined;
+    const fullName = rawName?.trim() || null;
 
     const productKind = String(body.productKind ?? '').trim() || 'checkout';
     const dup = await assertPrelaunchWebhookPurchaseAllowed(supabase, userId, productKind);

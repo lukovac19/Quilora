@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowRight, Check } from 'lucide-react';
 import { useApp, type User } from '../context/AppContext';
-import { supabase } from '../lib/supabase';
+import { applyOnboardingProfilePatch } from '../lib/profileClientUpdate';
 
 /** Pre-launch onboarding v4 — persisted JSON (flow doc Phase 3C). */
 export interface QuiloraOnboardingV4 {
@@ -94,14 +94,7 @@ export function OnboardingPage() {
       /* ignore */
     }
     if (user) {
-      await supabase
-        .from('profiles')
-        .update({
-          full_name: v4.displayName,
-          streak_goal: 1,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', user.id);
+      await applyOnboardingProfilePatch(user.id, v4.displayName);
       setUser({
         ...user,
         name: v4.displayName,
