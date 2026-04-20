@@ -18,9 +18,14 @@ export function dodoApiBase(): string {
   return mode === 'live_mode' ? 'https://live.dodopayments.com' : 'https://test.dodopayments.com';
 }
 
+/** Prefer `DODO_PAYMENTS_API_KEY`; accept `DODO_API_KEY` for older dashboards. Never log values. */
+export function getDodoApiKey(): string | null {
+  return Deno.env.get('DODO_PAYMENTS_API_KEY')?.trim() || Deno.env.get('DODO_API_KEY')?.trim() || null;
+}
+
 function authHeaders(): HeadersInit {
-  const key = Deno.env.get('DODO_PAYMENTS_API_KEY')?.trim();
-  if (!key) throw new Error('DODO_PAYMENTS_API_KEY missing');
+  const key = getDodoApiKey();
+  if (!key) throw new Error('Dodo merchant API key missing (set DODO_PAYMENTS_API_KEY or DODO_API_KEY on the Edge function)');
   return {
     Authorization: `Bearer ${key}`,
     'Content-Type': 'application/json',
@@ -29,8 +34,8 @@ function authHeaders(): HeadersInit {
 
 /** Full refund for a completed payment (uses payment id from Dodo). */
 export async function dodoCreateFullRefund(paymentId: string, reason: string): Promise<DodoApiResult> {
-  const key = Deno.env.get('DODO_PAYMENTS_API_KEY')?.trim();
-  if (!key) return { ok: false, error: 'DODO_PAYMENTS_API_KEY not configured' };
+  const key = getDodoApiKey();
+  if (!key) return { ok: false, error: 'Dodo API key not configured (DODO_PAYMENTS_API_KEY or DODO_API_KEY)' };
   const base = dodoApiBase();
   const res = await fetch(`${base}/refunds`, {
     method: 'POST',
@@ -47,8 +52,8 @@ export async function dodoCreateFullRefund(paymentId: string, reason: string): P
 
 /** Cancel subscription immediately (merchant-initiated). */
 export async function dodoCancelSubscriptionImmediately(subscriptionId: string): Promise<DodoApiResult> {
-  const key = Deno.env.get('DODO_PAYMENTS_API_KEY')?.trim();
-  if (!key) return { ok: false, error: 'DODO_PAYMENTS_API_KEY not configured' };
+  const key = getDodoApiKey();
+  if (!key) return { ok: false, error: 'Dodo API key not configured (DODO_PAYMENTS_API_KEY or DODO_API_KEY)' };
   const base = dodoApiBase();
   const sid = subscriptionId.trim();
   const res = await fetch(`${base}/subscriptions/${encodeURIComponent(sid)}`, {

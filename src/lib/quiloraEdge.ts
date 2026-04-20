@@ -3,6 +3,11 @@ import { supabase } from './supabase';
 
 export const QUILORA_EDGE_SLUG = 'make-server-5a3d4811';
 
+/** Canonical Dodo checkout session route (Hono). Same handler as `BILLING_CREATE_CHECKOUT_SESSION_PATH`. */
+export const BILLING_DODO_CHECKOUT_SESSION_PATH = `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-session`;
+/** Alias kept for older clients; Edge mounts the same handler as `BILLING_DODO_CHECKOUT_SESSION_PATH`. */
+export const BILLING_CREATE_CHECKOUT_SESSION_PATH = `${QUILORA_EDGE_SLUG}/billing/create-checkout-session`;
+
 const DEFAULT_EDGE_TIMEOUT_MS = 45_000;
 
 const DEEPSEEK_API = 'https://api.deepseek.com/chat/completions';
@@ -106,7 +111,28 @@ export async function quiloraEdgeGetJson<T>(relativePath: string, accessToken?: 
   return res.json() as Promise<T>;
 }
 
-export async function quiloraEdgePostJson<T>(relativePath: string, accessToken: string, jsonBody: unknown): Promise<T> {
+/**
+ * POST JSON to Edge. Sends `apikey` (anon) + `Authorization: Bearer <access_token>`.
+ * If `accessToken` is missing/blank, loads the current Supabase session JWT so checkout and other user routes work reliably.
+ */
+export async function quiloraEdgePostJson<T>(
+  relativePath: string,
+  accessToken: string | null | undefined,
+  jsonBody: unknown,
+): Promise<T> {
+  let bearer = typeof accessToken === 'string' ? accessToken.trim() : '';
+  if (!bearer) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    bearer = session?.access_token?.trim() ?? '';
+  }
+  if (!bearer) {
+    throw new Error(
+      'Sign in required — no Supabase session access_token. Send Authorization: Bearer <access_token> from auth.getSession().',
+    );
+  }
+
   const url = new URL(relativePath.replace(/^\//, ''), `${quiloraFunctionsBaseUrl()}/`);
   let res: Response;
   try {
@@ -117,7 +143,7 @@ export async function quiloraEdgePostJson<T>(relativePath: string, accessToken: 
         headers: {
           'Content-Type': 'application/json',
           apikey: resolveSupabaseAnonKeyForClient(),
-          Authorization: `Bearer ${accessToken}`,
+          Authorization: `Bearer ${bearer}`,
         },
         body: JSON.stringify(jsonBody),
       },

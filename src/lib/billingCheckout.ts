@@ -1,4 +1,4 @@
-import { QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from './quiloraEdge';
+import { BILLING_DODO_CHECKOUT_SESSION_PATH, QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from './quiloraEdge';
 import { scheduleWebhookDelayWatchAfterCheckout } from './postCheckoutWebhookDelayWatch';
 import { supabase } from './supabase';
 
@@ -47,6 +47,13 @@ function productIdFor(product: CheckoutProductKey): string | null {
 /** Public Dodo product / price id for overlay checkout (from `NEXT_PUBLIC_PRICE_ID_*` or legacy `VITE_*`). */
 export function getCheckoutProductId(product: CheckoutProductKey): string | null {
   return productIdFor(product);
+}
+
+/** Resolve Dodo product id from a checkout plan key (same mapping as `PRODUCT_ENV_KEYS`). For legacy POST bodies that send `planKey` instead of `productId`. */
+export function productIdFromCheckoutPlanKey(planKey: string): string | null {
+  const p = planKey.trim();
+  if (!Object.prototype.hasOwnProperty.call(PRODUCT_ENV_KEYS, p)) return null;
+  return productIdFor(p as CheckoutProductKey);
 }
 
 export function dodoCheckoutConfigured(): boolean {
@@ -185,7 +192,7 @@ export async function openDodoCheckout(params: {
 
     console.log('[debug] productId being sent:', productId);
     const session = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
-      `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-session`,
+      BILLING_DODO_CHECKOUT_SESSION_PATH,
       bearer,
       { productId, productKind: params.product },
     );

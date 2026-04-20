@@ -19,7 +19,7 @@ import {
   setTier,
 } from './credit_service.ts';
 import { getGenesisInventory } from './billing_genesis_service.ts';
-import { dodoCreateCheckoutSession, dodoCreateCustomerPortalSession } from './dodo_billing_api.ts';
+import { dodoCreateCheckoutSession, dodoCreateCustomerPortalSession, getDodoApiKey } from './dodo_billing_api.ts';
 import { hasProcessedDodoWebhook, markDodoWebhookProcessed, processDodoWebhookPayload, verifyDodoWebhook } from './dodo_webhook.ts';
 import {
   adminLinkOrphanPayment,
@@ -36,18 +36,41 @@ import {
   setPublicLaunchComplete,
 } from './prelaunch_v4_service.ts';
 
-/** Applied to every Edge response (browser calls from https://www.quilora.app). */
-const corsHeaders: Record<string, string> = {
-  'Access-Control-Allow-Origin': 'https://www.quilora.app',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-};
+const CORS_ALLOW_HEADERS = 'authorization, x-client-info, apikey, content-type';
+const CORS_ALLOW_METHODS = 'GET, POST, PUT, DELETE, OPTIONS';
 
-function withCors(res: Response): Response {
-  const headers = new Headers(res.headers);
-  for (const [k, v] of Object.entries(corsHeaders)) {
-    headers.set(k, v);
+function corsAllowedOrigins(): Set<string> {
+  const out = new Set<string>(['https://www.quilora.app']);
+  const extras = Deno.env.get('CORS_EXTRA_ORIGINS')?.split(',') ?? [];
+  for (const s of extras) {
+    const t = s.trim().replace(/\/$/, '');
+    if (t) out.add(t);
   }
+  for (const k of ['PUBLIC_APP_URL', 'SITE_URL', 'APP_URL'] as const) {
+    const u = Deno.env.get(k)?.trim().replace(/\/$/, '');
+    if (u) out.add(u);
+  }
+  return out;
+}
+
+function pickCorsOrigin(req: Request): string {
+  const origin = req.headers.get('Origin')?.trim().replace(/\/$/, '') ?? '';
+  if (origin && corsAllowedOrigins().has(origin)) return origin;
+  return 'https://www.quilora.app';
+}
+
+function corsHeadersFor(req: Request): Headers {
+  const h = new Headers();
+  h.set('Access-Control-Allow-Origin', pickCorsOrigin(req));
+  h.set('Access-Control-Allow-Headers', CORS_ALLOW_HEADERS);
+  h.set('Access-Control-Allow-Methods', CORS_ALLOW_METHODS);
+  return h;
+}
+
+function withCors(res: Response, req: Request): Response {
+  const headers = new Headers(res.headers);
+  const cors = corsHeadersFor(req);
+  cors.forEach((v, k) => headers.set(k, v));
   return new Response(res.body, {
     status: res.status,
     statusText: res.statusText,
@@ -100,15 +123,22 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Helper to verify auth token
-async function verifyAuth(authHeader: string | null) {
-  if (!authHeader) return null;
-  const token = authHeader.split(' ')[1];
+/** Validates `Authorization: Bearer <Supabase access_token>` (case-insensitive, robust parsing). */
+async function verifyAuth(authHeader: string | null | undefined): Promise<string | null> {
+  const raw = authHeader?.trim();
+  if (!raw) return null;
+  const m = /^Bearer\s+([\s\S]+)$/i.exec(raw);
+  const token = m?.[1]?.trim() ?? '';
   if (!token) return null;
-  
+
   const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) return null;
-  
+  if (error || !user) {
+    console.warn('[auth] getUser failed', {
+      code: error?.code ?? null,
+      message: error?.message ? String(error.message).slice(0, 200) : null,
+    });
+    return null;
+  }
   return user.id;
 }
 
@@ -127,12 +157,35 @@ function jsonSafeError(err: unknown): Record<string, unknown> {
   return { value: String(err) };
 }
 
+/** Same plan keys / env names as client `src/lib/billingCheckout.ts` — resolves legacy `planKey` POST bodies on the Edge function. */
+const CHECKOUT_PLAN_KEY_ENV: Record<string, readonly string[]> = {
+  bookworm_monthly: ['NEXT_PUBLIC_PRICE_ID_BOOKWORM_MONTHLY', 'VITE_DODO_PRODUCT_BOOKWORM_MONTHLY'],
+  bookworm_yearly: ['NEXT_PUBLIC_PRICE_ID_BOOKWORM_YEARLY', 'VITE_DODO_PRODUCT_BOOKWORM_YEARLY'],
+  sage_monthly: ['NEXT_PUBLIC_PRICE_ID_SAGE_MONTHLY', 'VITE_DODO_PRODUCT_BIBLIOPHILE_MONTHLY'],
+  sage_yearly: ['NEXT_PUBLIC_PRICE_ID_SAGE_YEARLY', 'VITE_DODO_PRODUCT_BIBLIOPHILE_YEARLY'],
+  lifetime_early_bird: ['NEXT_PUBLIC_PRICE_ID_LIFETIME_EARLY_BIRD', 'VITE_DODO_PRODUCT_GENESIS_80'],
+  lifetime_standard: ['NEXT_PUBLIC_PRICE_ID_LIFETIME_STANDARD', 'VITE_DODO_PRODUCT_GENESIS_119'],
+  lifetime_plus_sage: ['NEXT_PUBLIC_PRICE_ID_LIFETIME_PLUS_SAGE'],
+  boost_pack: ['VITE_DODO_PRODUCT_BOOST_PACK'],
+};
+
+function productIdFromPlanKeyEnv(planKey: string): string {
+  const pk = planKey.trim();
+  const keys = CHECKOUT_PLAN_KEY_ENV[pk];
+  if (!keys) return '';
+  for (const k of keys) {
+    const v = Deno.env.get(k)?.trim();
+    if (v) return v;
+  }
+  return '';
+}
+
 /** Accept camelCase, snake_case, price IDs, and optional `{ data: { ... } }` wrappers from different clients. */
 function pickProductIdFromCheckoutBody(raw: Record<string, unknown>): string {
   const nested =
     typeof raw.data === 'object' && raw.data !== null ? (raw.data as Record<string, unknown>) : null;
   const pick = (o: Record<string, unknown> | null, k: string) => String(o?.[k] ?? '').trim();
-  return (
+  const direct =
     pick(raw, 'productId') ||
     pick(raw, 'product_id') ||
     pick(raw, 'priceId') ||
@@ -141,24 +194,31 @@ function pickProductIdFromCheckoutBody(raw: Record<string, unknown>): string {
     pick(nested, 'productId') ||
     pick(nested, 'product_id') ||
     pick(nested, 'priceId') ||
-    pick(nested, 'price_id') ||
-    ''
-  );
+    pick(nested, 'price_id');
+  if (direct) return direct;
+  const planKey =
+    pick(raw, 'planKey') ||
+    pick(raw, 'plan_key') ||
+    pick(nested, 'planKey') ||
+    pick(nested, 'plan_key');
+  return productIdFromPlanKeyEnv(planKey);
 }
 
 function pickProductKindFromCheckoutBody(raw: Record<string, unknown>): string {
   const nested =
     typeof raw.data === 'object' && raw.data !== null ? (raw.data as Record<string, unknown>) : null;
-  return (
-    String(
-      raw.productKind ??
-        raw.product_kind ??
-        raw.checkoutProduct ??
-        nested?.productKind ??
-        nested?.product_kind ??
-        '',
-    ).trim() || 'checkout'
-  );
+  const fromKind = String(
+    raw.productKind ??
+      raw.product_kind ??
+      raw.checkoutProduct ??
+      nested?.productKind ??
+      nested?.product_kind ??
+      '',
+  ).trim();
+  if (fromKind) return fromKind;
+  const planKey = String(raw.planKey ?? raw.plan_key ?? nested?.planKey ?? nested?.plan_key ?? '').trim();
+  if (planKey) return planKey;
+  return 'checkout';
 }
 
 function normalizedTierFromLegacy(raw: string | undefined): QuiloraTier {
@@ -1008,16 +1068,54 @@ app.post('/make-server-5a3d4811/billing/boost-pack/simulate', async (c) => {
   }
 });
 
+function checkoutHandlerEnvFlags(): Record<string, boolean> {
+  return {
+    hasSupabaseUrl: Boolean(Deno.env.get('SUPABASE_URL')?.trim()),
+    hasServiceRoleKey: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')?.trim()),
+    hasDodoApiKey: Boolean(getDodoApiKey()),
+    hasPublicAppUrl: Boolean(Deno.env.get('PUBLIC_APP_URL')?.trim()),
+    hasSiteUrl: Boolean(Deno.env.get('SITE_URL')?.trim() || Deno.env.get('APP_URL')?.trim()),
+  };
+}
+
+/** Dodo-only checkout session (no Paddle). */
 const handleDodoCheckoutSession = async (c: Context) => {
   try {
+    console.log('[checkout] request', {
+      path: new URL(c.req.url).pathname,
+      hasAuthorizationHeader: Boolean(c.req.header('Authorization')?.trim()),
+      ...checkoutHandlerEnvFlags(),
+    });
+
     const userId = await verifyAuth(c.req.header('Authorization'));
-    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+    if (!userId) {
+      return c.json(
+        {
+          error: 'Unauthorized',
+          code: 'AUTH_JWT_INVALID',
+          hint: 'Send Authorization: Bearer <Supabase access_token> from auth.getSession() (not the anon key).',
+        },
+        401,
+      );
+    }
+
+    if (!getDodoApiKey()) {
+      return c.json(
+        {
+          error: 'Dodo Payments is not configured on this function.',
+          code: 'DODO_NOT_CONFIGURED',
+          hint: 'Set DODO_PAYMENTS_API_KEY or DODO_API_KEY in Edge function secrets.',
+        },
+        503,
+      );
+    }
+
     let raw: Record<string, unknown>;
     try {
       raw = (await c.req.json()) as Record<string, unknown>;
     } catch (parseErr) {
       console.error('billing/checkout-session JSON parse error:', JSON.stringify(jsonSafeError(parseErr), null, 2));
-      return c.json({ error: 'Invalid JSON body' }, 400);
+      return c.json({ error: 'Invalid JSON body', code: 'INVALID_JSON' }, 400);
     }
     const productId = pickProductIdFromCheckoutBody(raw);
     if (!productId) {
@@ -1029,7 +1127,7 @@ const handleDodoCheckoutSession = async (c: Context) => {
         'body:',
         JSON.stringify(raw, null, 2),
       );
-      return c.json({ error: 'Missing productId' }, 400);
+      return c.json({ error: 'Missing productId', code: 'MISSING_PRODUCT_ID' }, 400);
     }
 
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
@@ -1053,10 +1151,14 @@ const handleDodoCheckoutSession = async (c: Context) => {
         /* optional */
       }
     }
-    const site = Deno.env.get('PUBLIC_APP_URL')?.trim() || 'https://www.quilora.app';
+    const site =
+      Deno.env.get('PUBLIC_APP_URL')?.trim() ||
+      Deno.env.get('SITE_URL')?.trim() ||
+      Deno.env.get('APP_URL')?.trim() ||
+      'https://www.quilora.app';
     const returnUrl =
-      Deno.env.get('DODO_CHECKOUT_RETURN_URL')?.trim() || 'https://www.quilora.app/checkout/success';
-    const cancelUrl = Deno.env.get('DODO_CHECKOUT_CANCEL_URL')?.trim() || `${site}/pricing`;
+      Deno.env.get('DODO_CHECKOUT_RETURN_URL')?.trim() || `${site.replace(/\/$/, '')}/checkout/success`;
+    const cancelUrl = Deno.env.get('DODO_CHECKOUT_CANCEL_URL')?.trim() || `${site.replace(/\/$/, '')}/pricing`;
     const session = await dodoCreateCheckoutSession({
       productCart: [{ product_id: productId, quantity: 1 }],
       metadata: meta,
@@ -1067,13 +1169,31 @@ const handleDodoCheckoutSession = async (c: Context) => {
       cancelUrl,
     });
     if ('error' in session) {
-      console.error('dodo checkout-session', session.error);
-      return c.json({ error: session.error }, 502);
+      console.error('dodo checkout-session Dodo API error', String(session.error).slice(0, 400));
+      return c.json(
+        {
+          error: 'Dodo checkout failed',
+          code: 'DODO_CHECKOUT_REJECTED',
+          detail: String(session.error).slice(0, 400),
+        },
+        502,
+      );
     }
     return c.json({ checkoutUrl: session.checkoutUrl });
   } catch (error) {
-    console.error('dodo checkout-session', error);
-    return c.json({ error: 'checkout_session_failed' }, 500);
+    console.error('dodo checkout-session', jsonSafeError(error));
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/Dodo API key missing|Dodo merchant API key missing|not configured/i.test(msg)) {
+      return c.json({ error: 'Dodo Payments not configured.', code: 'DODO_NOT_CONFIGURED' }, 503);
+    }
+    return c.json(
+      {
+        error: 'checkout_session_failed',
+        code: 'CHECKOUT_EXCEPTION',
+        hint: msg.slice(0, 200),
+      },
+      500,
+    );
   }
 };
 
@@ -1197,18 +1317,17 @@ app.post('/make-server-5a3d4811/questions/generate', async (c) => {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeadersFor(req) });
   }
   try {
-    return withCors(await app.fetch(req));
+    return withCors(await app.fetch(req), req);
   } catch (err) {
     console.error('Edge handler error', err);
+    const h = corsHeadersFor(req);
+    h.set('Content-Type', 'application/json');
     return new Response(JSON.stringify({ error: 'internal_server_error' }), {
       status: 500,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-      },
+      headers: h,
     });
   }
 });

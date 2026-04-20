@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router';
 import { toast } from 'sonner@2.0.3';
-import { QUILORA_EDGE_SLUG, quiloraEdgePostJson } from '../lib/quiloraEdge';
+import { BILLING_DODO_CHECKOUT_SESSION_PATH, quiloraEdgePostJson } from '../lib/quiloraEdge';
 import { supabase } from '../lib/supabase';
 import { dodoCheckoutConfigured, fetchCheckoutEligibility } from '../lib/billingCheckout';
 import { scheduleWebhookDelayWatchAfterCheckout } from '../lib/postCheckoutWebhookDelayWatch';
@@ -92,7 +92,7 @@ export function CheckoutButton({
       }
       console.log('[debug] productId being sent:', productId);
       const session = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
-        `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-session`,
+        BILLING_DODO_CHECKOUT_SESSION_PATH,
         bearer,
         { productId, productKind },
       );
