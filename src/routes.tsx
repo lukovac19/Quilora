@@ -65,13 +65,24 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { DashboardFrame2 } from "./pages/DashboardFrame2";
 import { SandboxLoadingFrame } from "./pages/SandboxLoadingFrame";
 import { AiRagDebugPage } from "./pages/AiRagDebugPage";
+
+/**
+ * Public homepage mode toggle:
+ * - default / fallback: prelaunch
+ * - set VITE_PUBLIC_HOMEPAGE_MODE=landing to restore normal landing page on `/`
+ */
+const publicHomepageMode = String(import.meta.env.VITE_PUBLIC_HOMEPAGE_MODE ?? "prelaunch")
+  .trim()
+  .toLowerCase();
+const showPrelaunchHomepage = publicHomepageMode !== "landing";
+
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: RootLayout,
     errorElement: <RouteErrorFallback />,
     children: [
-      { index: true, Component: PreLaunchPage },
+      { index: true, element: showPrelaunchHomepage ? <PreLaunchPage /> : <QuiloraLandingPage /> },
       {
         path: "early-access/genesis-welcome",
         element: <Navigate to="/early-access" replace />,

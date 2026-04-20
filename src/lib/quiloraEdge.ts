@@ -45,7 +45,14 @@ export function quiloraFunctionsBaseUrl() {
 /** True for Edge routes that require the logged-in user's JWT (not only the anon `apikey`). */
 function quiloraEdgeGetRequiresUserJwt(relativePath: string): boolean {
   const p = relativePath.replace(/^\//, '');
-  return p.includes('/billing/me') || p.includes('/auth/me');
+  return (
+    p.includes('/billing/me') ||
+    p.includes('/billing/genesis-inventory') ||
+    p.includes('/billing/app-state') ||
+    p.includes('/billing/create-checkout-session') ||
+    p.includes('/billing/dodo/checkout-session') ||
+    p.includes('/auth/me')
+  );
 }
 
 /**

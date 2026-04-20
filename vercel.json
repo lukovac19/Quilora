@@ -1,7 +1,4 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm run build",
-  "outputDirectory": "build",
   "rewrites": [
     {
       "source": "/((?!api/).*)",
@@ -11,7 +8,7 @@
   "crons": [
     {
       "path": "/api/cron/reconcile-orphan-payments",
-      "schedule": "0 3 * * *"
+      "schedule": "0 6 * * *"
     }
   ]
 }
