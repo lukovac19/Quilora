@@ -126,8 +126,16 @@ export async function openDodoCheckout(params: {
   email?: string | null;
   onCheckoutCompleted?: (product: CheckoutProductKey) => void;
 }): Promise<OpenCheckoutResult> {
+  console.log('[debug] openDodoCheckout called:', {
+    product: params.product,
+    productId: productIdFor(params.product),
+    envVars: {
+      NEXT_PUBLIC_PRICE_ID_BOOKWORM_MONTHLY: import.meta.env.NEXT_PUBLIC_PRICE_ID_BOOKWORM_MONTHLY,
+      VITE_DODO_PRODUCT_BOOKWORM_MONTHLY: import.meta.env.VITE_DODO_PRODUCT_BOOKWORM_MONTHLY,
+    },
+  });
   const productId = productIdFor(params.product);
-    if (!dodoCheckoutConfigured()) {
+  if (!dodoCheckoutConfigured()) {
     return {
       ok: false,
       reason: 'no_dodo',
@@ -175,6 +183,7 @@ export async function openDodoCheckout(params: {
       }
     }
 
+    console.log('[debug] productId being sent:', productId);
     const session = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
       `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-session`,
       bearer,
