@@ -112,6 +112,55 @@ async function verifyAuth(authHeader: string | null) {
   return user.id;
 }
 
+/** Edge logs — `JSON.stringify(Error)` is `{}`; use this for a readable payload. */
+function jsonSafeError(err: unknown): Record<string, unknown> {
+  if (err instanceof Error) {
+    return { name: err.name, message: err.message, stack: err.stack };
+  }
+  if (typeof err === 'object' && err !== null) {
+    try {
+      return JSON.parse(JSON.stringify(err)) as Record<string, unknown>;
+    } catch {
+      return { stringified: String(err) };
+    }
+  }
+  return { value: String(err) };
+}
+
+/** Accept camelCase, snake_case, price IDs, and optional `{ data: { ... } }` wrappers from different clients. */
+function pickProductIdFromCheckoutBody(raw: Record<string, unknown>): string {
+  const nested =
+    typeof raw.data === 'object' && raw.data !== null ? (raw.data as Record<string, unknown>) : null;
+  const pick = (o: Record<string, unknown> | null, k: string) => String(o?.[k] ?? '').trim();
+  return (
+    pick(raw, 'productId') ||
+    pick(raw, 'product_id') ||
+    pick(raw, 'priceId') ||
+    pick(raw, 'price_id') ||
+    pick(raw, 'dodoProductId') ||
+    pick(nested, 'productId') ||
+    pick(nested, 'product_id') ||
+    pick(nested, 'priceId') ||
+    pick(nested, 'price_id') ||
+    ''
+  );
+}
+
+function pickProductKindFromCheckoutBody(raw: Record<string, unknown>): string {
+  const nested =
+    typeof raw.data === 'object' && raw.data !== null ? (raw.data as Record<string, unknown>) : null;
+  return (
+    String(
+      raw.productKind ??
+        raw.product_kind ??
+        raw.checkoutProduct ??
+        nested?.productKind ??
+        nested?.product_kind ??
+        '',
+    ).trim() || 'checkout'
+  );
+}
+
 function normalizedTierFromLegacy(raw: string | undefined): QuiloraTier {
   if (raw === 'lifetime' || raw === 'genesis') return 'genesis';
   if (raw === 'hardquest' || raw === 'bibliophile') return 'bibliophile';
@@ -238,8 +287,9 @@ const handleAuthMe = async (c: Context) => {
       subscriptionTier: profile.tier,
     };
     return c.json({ user: merged, billing, lowBalance });
-  } catch (error) {
-    console.error('Get user error:', error);
+  } catch (err) {
+    console.error('billing/me error:', JSON.stringify(jsonSafeError(err), null, 2));
+    console.error('billing/me error (raw):', err);
     return c.json({ error: 'Internal server error fetching user' }, 500);
   }
 };
@@ -960,9 +1010,25 @@ const handleDodoCheckoutSession = async (c: Context) => {
   try {
     const userId = await verifyAuth(c.req.header('Authorization'));
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
-    const body = (await c.req.json()) as { productId?: string; productKind?: string };
-    const productId = String(body.productId ?? '').trim();
-    if (!productId) return c.json({ error: 'Missing productId' }, 400);
+    let raw: Record<string, unknown>;
+    try {
+      raw = (await c.req.json()) as Record<string, unknown>;
+    } catch (parseErr) {
+      console.error('billing/checkout-session JSON parse error:', JSON.stringify(jsonSafeError(parseErr), null, 2));
+      return c.json({ error: 'Invalid JSON body' }, 400);
+    }
+    const productId = pickProductIdFromCheckoutBody(raw);
+    if (!productId) {
+      console.error(
+        'billing/checkout-session missing productId; content-type:',
+        c.req.header('content-type') ?? '(none)',
+        'body keys:',
+        Object.keys(raw),
+        'body:',
+        JSON.stringify(raw, null, 2),
+      );
+      return c.json({ error: 'Missing productId' }, 400);
+    }
 
     const { data: prof } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     const pr = prof as Record<string, unknown> | null;
@@ -970,7 +1036,7 @@ const handleDodoCheckoutSession = async (c: Context) => {
     const rawName = (pr?.full_name ?? pr?.display_name) as string | undefined;
     const fullName = rawName?.trim() || null;
 
-    const productKind = String(body.productKind ?? '').trim() || 'checkout';
+    const productKind = pickProductKindFromCheckoutBody(raw);
     const dup = await assertPrelaunchWebhookPurchaseAllowed(supabase, userId, productKind);
     if (!dup.ok) {
       return c.json({ error: dup.error, code: 'CHECKOUT_NOT_ALLOWED' }, 409);

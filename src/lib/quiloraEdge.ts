@@ -1,4 +1,5 @@
 import { resolveSupabaseAnonKeyForClient, resolveSupabaseProjectId } from '../utils/supabase/credentials';
+import { supabase } from './supabase';
 
 export const QUILORA_EDGE_SLUG = 'make-server-5a3d4811';
 
@@ -36,11 +37,43 @@ export function quiloraFunctionsBaseUrl() {
  * POST JSON to a Quilora edge path (e.g. `make-server-5a3d4811/chat/<sandboxId>`).
  * Sends both `apikey` and `Authorization` — required by the Supabase Functions gateway.
  */
-/** GET JSON from edge (e.g. public billing routes). Optional bearer for user-scoped routes. */
+/** True for Edge routes that require the logged-in user's JWT (not only the anon `apikey`). */
+function quiloraEdgeGetRequiresUserJwt(relativePath: string): boolean {
+  const p = relativePath.replace(/^\//, '');
+  return p.includes('/billing/me') || p.includes('/auth/me');
+}
+
+/**
+ * GET from Edge with `Authorization: Bearer <session.access_token>` from the current Supabase session.
+ */
+export async function quiloraEdgeGetJsonAsUser<T>(relativePath: string): Promise<T> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (!token) {
+    throw new Error('Sign in required');
+  }
+  return quiloraEdgeGetJson<T>(relativePath, token);
+}
+
+/**
+ * GET JSON from edge. Public routes can omit `accessToken` (only `apikey` is sent).
+ * For `.../billing/me` and `.../auth/me`, if `accessToken` is missing, the current session
+ * `access_token` is loaded via `getSession()` and sent as `Authorization: Bearer ...`.
+ */
 export async function quiloraEdgeGetJson<T>(relativePath: string, accessToken?: string | null): Promise<T> {
   const url = new URL(relativePath.replace(/^\//, ''), `${quiloraFunctionsBaseUrl()}/`);
   const headers: Record<string, string> = { apikey: resolveSupabaseAnonKeyForClient() };
-  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  let bearer = accessToken ?? undefined;
+  if (quiloraEdgeGetRequiresUserJwt(relativePath) && (bearer === undefined || bearer === null || bearer === '')) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    bearer = session?.access_token ?? undefined;
+  }
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
   let res: Response;
   try {
     res = await fetchWithTimeout(url.href, { method: 'GET', headers }, DEFAULT_EDGE_TIMEOUT_MS);
