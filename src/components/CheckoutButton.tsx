@@ -39,6 +39,12 @@ export function CheckoutButton({
   const [dupModal, setDupModal] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
   const onClick = useCallback(async () => {
+    console.log('[debug] all env vars:', {
+      bookworm_monthly: import.meta.env.NEXT_PUBLIC_PRICE_ID_BOOKWORM_MONTHLY,
+      vite_bookworm: import.meta.env.VITE_DODO_PRODUCT_BOOKWORM_MONTHLY,
+      productId_prop: productId,
+      dodoConfigured: dodoCheckoutConfigured(),
+    });
     if (!user?.id) {
       navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
       return;
@@ -84,6 +90,7 @@ export function CheckoutButton({
         toast.error('Sign in to continue.');
         return;
       }
+      console.log('[debug] productId being sent:', productId);
       const session = await quiloraEdgePostJson<{ checkoutUrl?: string; error?: string }>(
         `${QUILORA_EDGE_SLUG}/billing/dodo/checkout-session`,
         bearer,
