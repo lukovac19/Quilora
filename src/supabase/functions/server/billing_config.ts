@@ -1,4 +1,4 @@
-export type QuiloraTier = 'bookworm' | 'bibliophile' | 'genesis';
+export type QuiloraTier = 'bookworm' | 'bibliophile' | 'genesis' | 'early_access';
 
 /** Must match public.credit_events.event_type check constraint */
 export type CreditEventType =
@@ -36,6 +36,7 @@ export const CREDIT_RULES = {
 
 export const TIER_LIMITS: Record<QuiloraTier, { monthlyCredits: number; maxSandboxes: number | null }> = {
   bookworm: { monthlyCredits: 800, maxSandboxes: 5 },
+  early_access: { monthlyCredits: 800, maxSandboxes: 5 },
   bibliophile: { monthlyCredits: 2500, maxSandboxes: null },
   genesis: { monthlyCredits: 15000, maxSandboxes: null },
 };

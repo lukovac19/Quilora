@@ -80,9 +80,15 @@ export async function grantCredits(admin: SupabaseClient, input: {
   return { balance: res.credit_balance ?? 0, duplicate: Boolean(res.duplicate) };
 }
 
+const PROFILE_COLUMNS =
+  'id, tier, genesis_badge, alpha_lab_access, credit_balance, full_name, email';
+
 export async function getProfile(admin: SupabaseClient, userId: string) {
-  const { data, error } = await admin.from('profiles').select('*').eq('id', userId).maybeSingle();
-  if (error) throw error;
+  const { data, error } = await admin.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
+  if (error) {
+    console.error('getProfile profiles query error', { userId, message: error.message, code: error.code });
+    return null;
+  }
   return data as Record<string, unknown> | null;
 }
 
@@ -104,11 +110,12 @@ export async function getLowBalanceStatus(admin: SupabaseClient, userId: string)
 
 export async function getTierEntitlements(admin: SupabaseClient, userId: string) {
   const row = await getProfile(admin, userId);
-  const tier = (row?.tier as QuiloraTier) ?? 'bookworm';
+  const tier = (TIER_LIMITS[row?.tier as QuiloraTier] ? row?.tier : 'bookworm') as QuiloraTier;
+  const limits = TIER_LIMITS[tier];
   return {
     tier,
-    maxSandboxes: TIER_LIMITS[tier].maxSandboxes,
-    monthlyCredits: TIER_LIMITS[tier].monthlyCredits,
+    maxSandboxes: limits.maxSandboxes,
+    monthlyCredits: limits.monthlyCredits,
     rolloverEnabled: tier === 'bibliophile',
     genesisBadge: Boolean(row?.genesis_badge ?? row?.genesis),
     alphaLabAccess: Boolean(row?.alpha_lab_access),

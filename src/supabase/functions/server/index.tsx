@@ -273,17 +273,19 @@ const handleAuthMe = async (c: Context) => {
     }
 
     const userProfile = await kv.get(`user:${userId}`);
-    const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+    const profile = await getProfile(supabase, userId);
     if (!profile) {
       return c.json({ error: 'User not found' }, 404);
     }
 
     const billing = await getTierEntitlements(supabase, userId);
     const lowBalance = await getLowBalanceStatus(supabase, userId);
+    const emailStr = String(profile.email ?? '');
     const merged = userProfile ?? {
       id: userId,
-      email: profile.email,
-      name: profile.full_name ?? profile.email?.split('@')[0] ?? 'Reader',
+      email: emailStr,
+      name:
+        ((profile.full_name as string | undefined) ?? (emailStr.includes('@') ? emailStr.split('@')[0] : '')) || 'Reader',
       subscriptionTier: profile.tier,
     };
     return c.json({ user: merged, billing, lowBalance });
