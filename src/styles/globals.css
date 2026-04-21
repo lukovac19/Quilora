@@ -396,6 +396,72 @@ body {
   animation: scaleIn 250ms ease-out;
 }
 
+/* Pre-launch hero — one-shot fade + lift (no bounce) */
+@keyframes prelaunchFadeLift {
+  from {
+    opacity: 0;
+    transform: translateY(0.42rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes prelaunchQuiloraChar {
+  from {
+    opacity: 0;
+    transform: translateY(0.26em);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-prelaunch-fade-lift {
+  opacity: 0;
+  animation: prelaunchFadeLift 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Early-access headline clauses — fade-first, minimal lift */
+@keyframes prelaunchHeadlineFadeLift {
+  from {
+    opacity: 0;
+    transform: translateY(0.1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-prelaunch-headline-reveal {
+  opacity: 0;
+  animation: prelaunchHeadlineFadeLift 0.9s cubic-bezier(0.33, 0.02, 0.32, 1) forwards;
+}
+
+/* Early-access subhead — softer lift, ease-out, slightly longer */
+@keyframes prelaunchSubFadeLift {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-prelaunch-sub-reveal {
+  opacity: 0;
+  animation: prelaunchSubFadeLift 1.08s ease-out forwards;
+}
+
+.animate-prelaunch-quilora-char {
+  animation: prelaunchQuiloraChar 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .animate-shimmer {
   animation: shimmer 2s infinite linear;
   background: linear-gradient(

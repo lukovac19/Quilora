@@ -459,7 +459,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               <ul className="mb-8 flex flex-1 flex-col space-y-3">
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  One-time 15,000 legacy AI credits included
+                  15,000 legacy credits (one-time allocation)
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
@@ -728,12 +728,18 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               </div>
             </div>
             <ul className="mb-8 flex flex-1 flex-col space-y-3">
-              {['15,000 credits / month', 'Unlimited sandboxes', 'Genesis badge & perks'].map((f) => (
-                <li key={f} className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
-                  <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  {f}
-                </li>
-              ))}
+              <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
+                <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
+                15,000 legacy credits (one-time allocation)
+              </li>
+              <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
+                <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
+                Unlimited sandboxes
+              </li>
+              <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
+                <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
+                Genesis badge & perks
+              </li>
             </ul>
               <div className="mt-auto flex flex-col gap-2 pt-6">
               {!earlyBirdSoldOut && lifetimeEarlyId ? (
@@ -798,9 +804,9 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               </thead>
               <tbody className="text-white/70">
                 {[
-                  ['Monthly credits', '800', '2,500', '15,000'],
+                  ['AI credits', '800 / month', '2,500 / month', '15,000 legacy (one-time)'],
                   ['Sandboxes', 'Up to 5', 'Unlimited', 'Unlimited'],
-                  ['Credit rollover', '—', 'Yes', 'Yes'],
+                  ['Credit rollover', '—', 'Yes', '—'],
                   ['Billing', 'Monthly / yearly', 'Monthly / yearly', 'One-time lifetime'],
                 ].map(([a, b, c, d]) => (
                   <tr key={String(a)} className="border-b border-white/5">

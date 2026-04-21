@@ -39,25 +39,28 @@ const testimonials = [
 export function PreLaunchPage() {
   const navigate = useNavigate();
   const { user, authLoading } = useApp();
-  const [quiloraTypeIndex, setQuiloraTypeIndex] = useState(0);
+  const [quiloraRevealStarted, setQuiloraRevealStarted] = useState(false);
+  const [quiloraVisibleCount, setQuiloraVisibleCount] = useState(0);
 
   useEffect(() => {
     markPrelaunchFlowEntered();
   }, []);
 
   useEffect(() => {
-    if (quiloraTypeIndex >= QUILORA_HEADLINE_TAIL.length) return;
-    const id = window.setTimeout(() => setQuiloraTypeIndex((n) => n + 1), 70);
+    const id = window.setTimeout(() => setQuiloraRevealStarted(true), 340);
     return () => window.clearTimeout(id);
-  }, [quiloraTypeIndex]);
+  }, []);
 
   useEffect(() => {
-    const skipVerifiedBounce =
-      import.meta.env.DEV ||
-      String(import.meta.env.VITE_SKIP_PRELAUNCH_VERIFIED_REDIRECT ?? '')
-        .trim()
-        .toLowerCase() === 'true';
-    if (skipVerifiedBounce) return;
+    if (!quiloraRevealStarted) return;
+    if (quiloraVisibleCount >= QUILORA_HEADLINE_TAIL.length) return;
+    const id = window.setTimeout(() => setQuiloraVisibleCount((n) => n + 1), 86);
+    return () => window.clearTimeout(id);
+  }, [quiloraRevealStarted, quiloraVisibleCount]);
+
+  const quiloraComplete = quiloraVisibleCount >= QUILORA_HEADLINE_TAIL.length;
+
+  useEffect(() => {
     if (authLoading) return;
     if (user?.emailConfirmed) {
       // AUTH-10: returning verified users skip splash → pre-launch pricing / account path (not raw canvas).
@@ -74,18 +77,55 @@ export function PreLaunchPage() {
           <div className="animate-fade-in-up space-y-6 sm:space-y-8">
             <div className="relative mx-auto max-w-4xl px-2">
               <div
-                className="pointer-events-none absolute left-1/2 top-[40%] h-[min(16rem,42vw)] w-[min(36rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-50"
-                style={{
-                  background:
-                    'radial-gradient(closest-side, rgba(123,189,243,0.18), rgba(38,107,167,0.06) 42%, transparent 72%)',
-                  filter: 'blur(48px)',
-                }}
+                className="pointer-events-none absolute left-1/2 top-[42%] z-0 h-[min(22rem,52vw)] w-[min(46rem,98vw)] -translate-x-1/2 -translate-y-1/2"
                 aria-hidden
-              />
-              <h1 className="quilora-heading-hero relative mx-auto max-w-4xl font-bold leading-tight text-white">
-                QuoteQuest is evolving into{' '}
-                <span className="inline-block bg-gradient-to-r from-[#f0f7ff] via-[#7bbdf3] to-[#5ec4e8] bg-clip-text text-transparent drop-shadow-[0_0_18px_rgba(123,189,243,0.22)]">
-                  {QUILORA_HEADLINE_TAIL.slice(0, quiloraTypeIndex)}
+              >
+                <div
+                  className="absolute inset-0 opacity-[0.88]"
+                  style={{
+                    background:
+                      'radial-gradient(ellipse 95% 78% at 50% 48%, rgba(123, 189, 243, 0.34) 0%, rgba(38, 107, 167, 0.16) 40%, transparent 68%)',
+                    filter: 'blur(56px)',
+                  }}
+                />
+                <div
+                  className="absolute inset-0 translate-x-[5%] opacity-[0.72]"
+                  style={{
+                    background:
+                      'radial-gradient(ellipse 72% 62% at 44% 36%, rgba(94, 196, 232, 0.26) 0%, rgba(38, 107, 167, 0.1) 46%, transparent 74%)',
+                    filter: 'blur(44px)',
+                  }}
+                />
+                <div
+                  className="absolute inset-0 -translate-y-[8%] opacity-[0.65]"
+                  style={{
+                    background:
+                      'radial-gradient(ellipse 58% 52% at 50% 40%, rgba(168, 220, 255, 0.22) 0%, rgba(38, 107, 167, 0.06) 52%, transparent 70%)',
+                    filter: 'blur(34px)',
+                  }}
+                />
+              </div>
+              <h1 className="quilora-heading-hero relative z-10 mx-auto max-w-4xl text-balance font-bold leading-tight">
+                <span className="animate-prelaunch-fade-lift inline text-white">
+                  QuoteQuest is evolving into{' '}
+                </span>
+                <span
+                  className={`inline-block bg-gradient-to-r from-[#f0f7ff] via-[#7bbdf3] to-[#5ec4e8] bg-clip-text text-transparent transition-[filter] duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    quiloraComplete
+                      ? 'drop-shadow-[0_0_22px_rgba(123,189,243,0.38)]'
+                      : 'drop-shadow-[0_0_8px_rgba(123,189,243,0.14)]'
+                  }`}
+                >
+                  {QUILORA_HEADLINE_TAIL.split('').map((ch, idx) =>
+                    idx < quiloraVisibleCount ? (
+                      <span
+                        key={idx}
+                        className="animate-prelaunch-quilora-char inline-block bg-gradient-to-r from-[#f0f7ff] via-[#7bbdf3] to-[#5ec4e8] bg-clip-text text-transparent"
+                      >
+                        {ch}
+                      </span>
+                    ) : null,
+                  )}
                 </span>
               </h1>
             </div>
