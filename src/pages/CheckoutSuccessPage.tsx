@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { clearCheckoutFunnelEntered } from '../lib/prelaunchFlowFlag';
 
 /**
  * Post–Dodo Checkout Session redirect (`return_url` → `/checkout/success`).
@@ -11,6 +12,10 @@ export function CheckoutSuccessPage() {
   useEffect(() => {
     void refreshAuthUser();
   }, [refreshAuthUser]);
+
+  useEffect(() => {
+    clearCheckoutFunnelEntered();
+  }, []);
 
   const email = user?.email?.trim();
   const leadLine = email ? `You're all set, ${email}.` : "You're all set.";

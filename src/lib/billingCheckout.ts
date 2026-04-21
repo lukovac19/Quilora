@@ -1,4 +1,5 @@
 import { BILLING_DODO_CHECKOUT_SESSION_PATH, QUILORA_EDGE_SLUG, quiloraEdgeGetJson, quiloraEdgePostJson } from './quiloraEdge';
+import { markCheckoutFunnelEntered } from './prelaunchFlowFlag';
 import { scheduleWebhookDelayWatchAfterCheckout } from './postCheckoutWebhookDelayWatch';
 import { supabase } from './supabase';
 
@@ -207,6 +208,7 @@ export async function openDodoCheckout(params: {
 
     scheduleWebhookDelayWatchAfterCheckout(params.userId, params.product);
     params.onCheckoutCompleted?.(params.product);
+    markCheckoutFunnelEntered();
     window.location.assign(checkoutUrl);
 
     return { ok: true };

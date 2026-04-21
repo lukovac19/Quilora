@@ -34,10 +34,13 @@ export function PreLaunchEarlyAccessPage() {
       <main className="flex-1 px-4 pb-16 pt-40 sm:px-6 sm:pb-20 sm:pt-44 md:pt-48 lg:pt-52">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-14 md:gap-20 lg:gap-24">
           <header className="w-full space-y-6 text-center md:space-y-8" aria-live="polite">
-            <h1 className="quilora-heading-section mx-auto flex max-w-5xl flex-wrap justify-center gap-x-3 gap-y-1 text-balance text-3xl font-bold leading-tight text-white sm:gap-x-4 md:flex-nowrap md:gap-x-[0.45em] lg:text-5xl">
-              <span className="animate-prelaunch-headline-reveal inline-block text-center">You found us early.</span>
+            <h1 className="quilora-heading-section mx-auto max-w-[min(100%,40rem)] text-balance text-center text-3xl font-bold leading-tight text-white lg:text-5xl">
+              <span className="animate-prelaunch-headline-reveal inline">You found us early.</span>
               {showHeadlineLine2 ? (
-                <span className="animate-prelaunch-headline-reveal inline-block text-center">That means something.</span>
+                <span className="animate-prelaunch-headline-reveal inline">
+                  {' '}
+                  That means something.
+                </span>
               ) : null}
             </h1>
             {showSubhead ? (

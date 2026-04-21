@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate, useRouteError, isRouteErrorResponse } from "react-router";
-import { hasPrelaunchFlowEntered } from "./lib/prelaunchFlowFlag";
+import { shouldBlockPublicMarketing } from "./lib/prelaunchFlowFlag";
 import { RootLayout } from "./layouts/RootLayout";
 import { QuiloraLandingPage } from "./pages/QuiloraLandingPage";
 import { AuthPage } from "./pages/AuthPage";
@@ -78,10 +78,17 @@ const publicHomepageMode = String(import.meta.env.VITE_PUBLIC_HOMEPAGE_MODE ?? "
 const showPrelaunchHomepage = publicHomepageMode !== "landing";
 
 function LandingHomeGate() {
-  if (hasPrelaunchFlowEntered()) {
-    return <Navigate to="/prelaunch" replace />;
+  if (shouldBlockPublicMarketing()) {
+    return <Navigate to="/early-access" replace />;
   }
   return <QuiloraLandingPage />;
+}
+
+function PricingFunnelGate() {
+  if (shouldBlockPublicMarketing()) {
+    return <Navigate to="/early-access" replace />;
+  }
+  return <PricingPage />;
 }
 
 export const router = createBrowserRouter([
@@ -133,9 +140,9 @@ export const router = createBrowserRouter([
         path: "how-it-works", 
         Component: HowItWorksPage 
       },
-      { 
-        path: "pricing", 
-        Component: PricingPage 
+      {
+        path: "pricing",
+        element: <PricingFunnelGate />,
       },
       {
         path: "checkout/success",

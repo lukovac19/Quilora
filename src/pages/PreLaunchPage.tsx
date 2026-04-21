@@ -72,8 +72,17 @@ export function PreLaunchPage() {
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden" style={{ backgroundColor: '#0a1929', fontFamily: 'Inter, sans-serif' }}>
       <QuiloraMarketingNavBar preLaunchScreen1Nav />
 
-      <main className="flex-1 px-4 pb-16 pt-40 sm:px-6 sm:pb-20 sm:pt-44 md:pt-48 lg:pt-52">
-        <div className="mx-auto max-w-5xl space-y-6 text-center sm:space-y-8">
+      <main className="relative flex-1 overflow-hidden px-4 pb-16 pt-40 sm:px-6 sm:pb-20 sm:pt-44 md:pt-48 lg:pt-52">
+        <div
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{
+            backgroundImage:
+              'repeating-linear-gradient(to right, rgba(123, 189, 243, 0.045) 0, rgba(123, 189, 243, 0.045) 1px, transparent 1px, transparent 40px), repeating-linear-gradient(to bottom, rgba(123, 189, 243, 0.04) 0, rgba(123, 189, 243, 0.04) 1px, transparent 1px, transparent 40px)',
+            opacity: 0.34,
+          }}
+          aria-hidden
+        />
+        <div className="relative z-10 mx-auto max-w-5xl space-y-6 text-center sm:space-y-8">
           <div className="animate-fade-in-up space-y-6 sm:space-y-8">
             <div className="relative mx-auto max-w-4xl px-2">
               <div

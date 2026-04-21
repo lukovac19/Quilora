@@ -8,6 +8,7 @@ import { dodoCheckoutConfigured, fetchCheckoutEligibility } from '../lib/billing
 import { scheduleWebhookDelayWatchAfterCheckout } from '../lib/postCheckoutWebhookDelayWatch';
 import { assertPrelaunchCheckoutAllowed, type PrelaunchCheckoutIntent } from '../lib/prelaunchPurchaseGuards';
 import { DuplicatePrelaunchPurchaseModal } from './prelaunch/DuplicatePrelaunchPurchaseModal';
+import { markCheckoutFunnelEntered } from '../lib/prelaunchFlowFlag';
 
 export type CheckoutButtonProps = {
   productId: string;
@@ -104,6 +105,7 @@ export function CheckoutButton({
       if (user?.id) {
         scheduleWebhookDelayWatchAfterCheckout(user.id, productKind);
       }
+      markCheckoutFunnelEntered();
       window.location.assign(checkoutUrl);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
