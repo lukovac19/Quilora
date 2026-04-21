@@ -18,6 +18,41 @@ import { markGenesisChoiceFlowPending } from '../../lib/genesisEarlyAccessSessio
 import { assertPrelaunchCheckoutAllowed } from '../../lib/prelaunchPurchaseGuards';
 import { DuplicatePrelaunchPurchaseModal } from '../prelaunch/DuplicatePrelaunchPurchaseModal';
 import { ScrollReveal } from '../ScrollReveal';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
+
+const TIP_AI_CREDITS =
+  'AI Credits are consumed only for AI interactions. PDF uploads and other features are already included in the plan depending on the availed Tier.';
+const TIP_SANDBOXES =
+  'Workspaces to organize your tasks. Create exclusive areas for specific themes, books, or projects.';
+const TIP_CREDITS_ROLLOVER =
+  'Unused credits carry over to the next month, ideal for users with fluctuating workloads.';
+const TIP_LEGACY_15K =
+  'This is a one-time AI credits boost exclusive for LTD accounts. These credits do not expire and act as a massive starter pool for your workspace.';
+const TIP_QUILORA_CAP =
+  'Shipping and size details will be coordinated with you via email within the next 90 days. Please note: Shipping costs are not included.';
+
+function PlanInfoTip({ label, text, triggerClassName }: { label: string; text: string; triggerClassName?: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className={`inline-flex shrink-0 cursor-help items-center justify-center rounded-full border-0 bg-transparent p-0.5 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#266ba7]/45 ${triggerClassName ?? 'text-[#7bbdf3]/90'}`}
+          aria-label={label}
+        >
+          <Info className="h-4 w-4" aria-hidden />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        sideOffset={6}
+        className="max-w-[min(320px,calc(100vw-2rem))] border border-white/15 bg-[#0f2336] px-3 py-2.5 text-left text-xs font-normal leading-relaxed text-white shadow-xl [&>svg]:fill-[#0f2336]"
+      >
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 export type PricingPlansBlockProps = {
   /** Early access: Monthly/Yearly toggle and plan cards only (no genesis banner, tax line, comparison table). */
@@ -68,7 +103,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [earlyAccessPricing]);
 
   const handleGetStarted = useCallback(() => {
-    navigate('/auth?mode=signup');
+    navigate('/auth?redirect=' + encodeURIComponent('/pricing'));
   }, [navigate]);
 
   const completedOpt = useMemo(() => {
@@ -78,7 +113,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
 
   const runCheckoutSubscription = useCallback(async () => {
     if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
+      navigate('/auth?redirect=' + encodeURIComponent('/pricing'));
       return;
     }
     const yearlyKey: CheckoutProductKey = 'bookworm_yearly';
@@ -116,7 +151,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
 
   const runBibliophileCheckout = useCallback(async () => {
     if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
+      navigate('/auth?redirect=' + encodeURIComponent('/pricing'));
       return;
     }
     const yearlyKey: CheckoutProductKey = 'sage_yearly';
@@ -139,6 +174,10 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [user, displayedBilling, navigate, handleGetStarted, completedOpt, onCheckoutCompleted]);
 
   const lockEarlyBookworm = useCallback(async () => {
+    if (!user?.id) {
+      navigate('/auth?redirect=' + encodeURIComponent('/early-access'));
+      return;
+    }
     if (user && !user.emailConfirmed) {
       toast.error('Please verify your email before checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
@@ -175,6 +214,10 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
   }, [user, displayedBilling, completedOpt, onCheckoutCompleted, navigate, toast]);
 
   const lockEarlySage = useCallback(async () => {
+    if (!user?.id) {
+      navigate('/auth?redirect=' + encodeURIComponent('/early-access'));
+      return;
+    }
     if (user && !user.emailConfirmed) {
       toast.error('Please verify your email before checkout.');
       navigate('/auth/verify-email?redirect=' + encodeURIComponent('/early-access'));
@@ -212,7 +255,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
 
   const claimGenesisSeatEarly = useCallback(() => {
     if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access/genesis-choice'));
+      navigate('/auth?redirect=' + encodeURIComponent('/early-access/genesis-choice'));
       return;
     }
     if (!user.emailConfirmed) {
@@ -337,17 +380,15 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
                   <span className="flex flex-wrap items-center gap-1.5">
                     800 AI credits per month (~25 sessions)
-                    <span
-                      className="inline-flex cursor-help text-[#7bbdf3]/90"
-                      title="1 credit ≈ 1 AI interaction. 800 credits ≈ ~25 sessions/month."
-                    >
-                      <Info className="h-4 w-4" aria-hidden />
-                    </span>
+                    <PlanInfoTip label="AI Credits" text={TIP_AI_CREDITS} />
                   </span>
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  5 Sandboxes
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    5 Sandboxes
+                    <PlanInfoTip label="Sandboxes" text={TIP_SANDBOXES} />
+                  </span>
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
@@ -399,21 +440,22 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-white" />
                   <span className="flex flex-wrap items-center gap-1.5">
                     2,500 AI credits per month (~80 sessions)
-                    <span
-                      className="inline-flex cursor-help text-white/80"
-                      title="1 credit ≈ 1 AI interaction. 2,500 credits ≈ ~80 sessions/month."
-                    >
-                      <Info className="h-4 w-4" aria-hidden />
-                    </span>
+                    <PlanInfoTip label="AI Credits" text={TIP_AI_CREDITS} triggerClassName="text-white/80" />
                   </span>
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/90">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-white" />
-                  Unused credits roll over every month
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    Unused credits roll over every month
+                    <PlanInfoTip label="Credits Rollover" text={TIP_CREDITS_ROLLOVER} triggerClassName="text-white/80" />
+                  </span>
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/90">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-white" />
-                  Unlimited Sandboxes
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    Unlimited Sandboxes
+                    <PlanInfoTip label="Sandboxes" text={TIP_SANDBOXES} triggerClassName="text-white/80" />
+                  </span>
                 </li>
               </ul>
               <div className="mt-auto pt-6">
@@ -429,7 +471,7 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
           </ScrollReveal>
 
           <ScrollReveal duration={0.42} yOffset={10} scale={1} delay={0.12} className="flex h-full min-h-0 flex-col">
-            <div className="flex h-full min-h-0 flex-col rounded-3xl border-2 border-[#266ba7]/50 bg-gradient-to-br from-[#1a2f45]/50 to-[#0a1929] p-8 transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-[#7bbdf3]/45 hover:shadow-[0_24px_48px_-12px_rgba(123,189,243,0.18)]">
+            <div className="flex h-full min-h-0 flex-col rounded-3xl border-2 border-amber-400/45 bg-gradient-to-br from-amber-950/30 via-[#1a2f45]/55 to-[#0a1929] p-8 shadow-[0_24px_56px_-14px_rgba(218,165,32,0.22)] transition-all duration-300 ease-out hover:-translate-y-1 hover:scale-[1.01] hover:border-amber-300/55 hover:shadow-[0_28px_64px_-12px_rgba(251,191,36,0.26)]">
               <div className="mb-6">
                 <h3 className="mb-1 text-2xl font-bold text-white">Lifetime Deal</h3>
               </div>
@@ -459,23 +501,29 @@ export function PricingPlansBlock({ earlyAccessPricing = false, onCheckoutComple
               <ul className="mb-8 flex flex-1 flex-col space-y-3">
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  15,000 legacy credits (one-time allocation)
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    15,000 one time legacy credits
+                    <PlanInfoTip label="15,000 Legacy Credits" text={TIP_LEGACY_15K} />
+                  </span>
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  Bookworm tier free forever
+                  Bookworm Plan free forever
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  20% lifetime discount on Sage and Future Higher tier plans.
+                  20% Lifetime discount on Sage and Future higher plans
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  Exclusive Genesis identity badge.
+                  Exclusive Genesis Account identity badge
                 </li>
                 <li className="flex items-start gap-3 text-sm leading-relaxed text-white/70">
                   <Check className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#266ba7]" />
-                  Exclusive Quilora Cap Merch
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    Quilora Cap (Exclusive for LTD)
+                    <PlanInfoTip label="Quilora Cap" text={TIP_QUILORA_CAP} />
+                  </span>
                 </li>
               </ul>
               <div className="mt-auto pt-6">

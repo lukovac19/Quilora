@@ -77,8 +77,8 @@ export function PreLaunchPage() {
           className="pointer-events-none absolute inset-0 z-0"
           style={{
             backgroundImage:
-              'repeating-linear-gradient(to right, rgba(123, 189, 243, 0.045) 0, rgba(123, 189, 243, 0.045) 1px, transparent 1px, transparent 40px), repeating-linear-gradient(to bottom, rgba(123, 189, 243, 0.04) 0, rgba(123, 189, 243, 0.04) 1px, transparent 1px, transparent 40px)',
-            opacity: 0.34,
+              'repeating-linear-gradient(to right, rgba(123, 189, 243, 0.07) 0, rgba(123, 189, 243, 0.07) 1px, transparent 1px, transparent 40px), repeating-linear-gradient(to bottom, rgba(123, 189, 243, 0.065) 0, rgba(123, 189, 243, 0.065) 1px, transparent 1px, transparent 40px)',
+            opacity: 0.42,
           }}
           aria-hidden
         />

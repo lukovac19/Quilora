@@ -165,7 +165,10 @@ export function AuthPage() {
   );
   const recoveryRef = useRef(recoveryFlow);
   recoveryRef.current = recoveryFlow;
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -194,6 +197,9 @@ export function AuthPage() {
       setSignUpPendingVerify(false);
       setForgotEmailSent(false);
       setPasswordResetSuccessBanner(false);
+      setFirstName('');
+      setLastName('');
+      setConfirmEmail('');
     },
     [setSearchParams],
   );
@@ -232,15 +238,22 @@ export function AuthPage() {
   const mapSessionToUser = useCallback((sessionUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown>; email_confirmed_at?: string | null }): User => {
     const meta = sessionUser.user_metadata as {
       name?: string;
+      first_name?: string;
+      last_name?: string;
       email_product_tips?: boolean;
       email_study_reminders?: boolean;
     } | undefined;
     const emailStr = sessionUser.email ?? '';
     const emailConfirmed = Boolean(sessionUser.email_confirmed_at);
+    const combinedFromNames = [meta?.first_name, meta?.last_name]
+      .map((s) => (typeof s === 'string' ? s.trim() : ''))
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     return {
       id: sessionUser.id,
       email: emailStr,
-      name: meta?.name || emailStr.split('@')[0] || 'Reader',
+      name: (meta?.name && String(meta.name).trim()) || combinedFromNames || emailStr.split('@')[0] || 'Reader',
       subscriptionTier: 'normal' as const,
       questionsAsked: 0,
       lastQuestionTime: null,
@@ -432,6 +445,21 @@ export function AuthPage() {
       if (mode === 'signup') {
         setDuplicateEmailError(false);
         setWeakPasswordMessage(null);
+        if (!firstName.trim()) {
+          setError('Please enter your first name.');
+          setLoading(false);
+          return;
+        }
+        if (!lastName.trim()) {
+          setError('Please enter your last name.');
+          setLoading(false);
+          return;
+        }
+        if (email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase()) {
+          setError('Confirm Email must match your email.');
+          setLoading(false);
+          return;
+        }
         if (password !== confirmPassword) {
           setError('Passwords do not match.');
           setLoading(false);
@@ -449,6 +477,11 @@ export function AuthPage() {
             password,
             options: {
               emailRedirectTo: authRedirectUrl,
+              data: {
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' '),
+              },
             },
           }),
           AUTH_REQUEST_TIMEOUT_MS,
@@ -603,6 +636,9 @@ export function AuthPage() {
 
   const inputClass =
     'w-full min-h-11 rounded-full border border-slate-200 bg-white py-3.5 pl-12 pr-4 text-base text-[#0f172a] placeholder:text-slate-400 shadow-sm transition-all focus:border-[#266ba7]/50 focus:outline-none focus:ring-2 focus:ring-[#266ba7]/15';
+
+  const inputClassPlain =
+    'w-full min-h-11 rounded-full border border-slate-200 bg-white px-4 py-3.5 text-base text-[#0f172a] placeholder:text-slate-400 shadow-sm transition-all focus:border-[#266ba7]/50 focus:outline-none focus:ring-2 focus:ring-[#266ba7]/15';
 
   const socialBtnClass =
     'flex min-h-11 w-full items-center justify-center gap-3 rounded-full border border-slate-300 bg-white px-4 py-3.5 text-base font-medium text-[#0f172a] shadow-sm transition-all hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50';
@@ -811,6 +847,40 @@ export function AuthPage() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {mode === 'signup' && !recoveryFlow && (
+                    <>
+                      <div>
+                        <label htmlFor="auth-first-name" className="sr-only">
+                          First name
+                        </label>
+                        <input
+                          id="auth-first-name"
+                          type="text"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          required
+                          autoComplete="given-name"
+                          className={inputClassPlain}
+                          placeholder="First name"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="auth-last-name" className="sr-only">
+                          Last name
+                        </label>
+                        <input
+                          id="auth-last-name"
+                          type="text"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          required
+                          autoComplete="family-name"
+                          className={inputClassPlain}
+                          placeholder="Last name"
+                        />
+                      </div>
+                    </>
+                  )}
                   {!recoveryFlow && (
                     <div>
                       <label htmlFor="auth-email" className="sr-only">
@@ -831,6 +901,26 @@ export function AuthPage() {
                           className={`${inputClass} ${duplicateEmailError ? 'border-amber-500 ring-2 ring-amber-100' : ''}`}
                           placeholder="Enter your email"
                           aria-invalid={duplicateEmailError}
+                        />
+                      </div>
+                    </div>
+                  )}
+                  {mode === 'signup' && !recoveryFlow && (
+                    <div>
+                      <label htmlFor="auth-confirm-email" className="sr-only">
+                        Confirm email
+                      </label>
+                      <div className="relative">
+                        <Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#266ba7]/60" />
+                        <input
+                          id="auth-confirm-email"
+                          type="email"
+                          value={confirmEmail}
+                          onChange={(e) => setConfirmEmail(e.target.value)}
+                          required
+                          autoComplete="email"
+                          className={inputClass}
+                          placeholder="Confirm email"
                         />
                       </div>
                     </div>

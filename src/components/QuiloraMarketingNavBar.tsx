@@ -9,7 +9,7 @@ const navLinkClass =
 export type QuiloraMarketingNavBarProps = {
   /** Pre-launch: logo only, no links or auth actions */
   logoOnly?: boolean;
-  /** Pre-launch Screen 1: logo + “Already purchased? Log in” (outlined, top-right) */
+  /** Pre-launch Screen 1: logo + “Already signed-up?” + Log-in pill (top-right) */
   preLaunchScreen1Nav?: boolean;
 };
 
@@ -41,12 +41,13 @@ export function QuiloraMarketingNavBar({ logoOnly = false, preLaunchScreen1Nav =
               <span className="truncate text-xl font-semibold text-white">Quilora</span>
             </Link>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
+              <span className="text-sm font-medium text-white/90 sm:text-base">Already signed-up?</span>
               <button
                 type="button"
                 onClick={() => navigate('/auth?mode=login')}
                 className="min-h-11 shrink-0 rounded-full border border-white/15 bg-white/5 px-5 py-2.5 text-sm font-medium text-white/90 transition-all duration-200 hover:-translate-y-0.5 hover:border-[#7bbdf3]/40 hover:bg-white/10 hover:text-white sm:px-6 sm:text-base"
               >
-                Already purchased? Log in
+                Log-in
               </button>
             </div>
           </div>

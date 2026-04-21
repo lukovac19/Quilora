@@ -47,7 +47,7 @@ export function CheckoutButton({
       dodoConfigured: dodoCheckoutConfigured(),
     });
     if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/pricing'));
+      navigate('/auth?redirect=' + encodeURIComponent('/pricing'));
       return;
     }
     if (requireEmailVerified && !user.emailConfirmed) {

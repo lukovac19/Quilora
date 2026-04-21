@@ -6,6 +6,7 @@ import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { useApp } from '../context/AppContext';
 import {
   fetchGenesisInventory,
+  getCheckoutProductId,
   isGenesisSoldOut,
   openDodoCheckout,
   type GenesisInventory,
@@ -81,7 +82,7 @@ export function GenesisChoicePage() {
       return;
     }
     if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access/genesis-choice'));
+      navigate('/auth?redirect=' + encodeURIComponent('/early-access/genesis-choice'));
       return;
     }
     if (import.meta.env.DEV) {
@@ -126,7 +127,7 @@ export function GenesisChoicePage() {
       return;
     }
     if (!user?.id) {
-      navigate('/auth?mode=signup&redirect=' + encodeURIComponent('/early-access/genesis-choice'));
+      navigate('/auth?redirect=' + encodeURIComponent('/early-access/genesis-choice'));
       return;
     }
     if (import.meta.env.DEV) {
@@ -137,6 +138,26 @@ export function GenesisChoicePage() {
       }
       afterGenesisCheckoutBookkeeping();
       navigate('/early-access', { replace: true });
+      return;
+    }
+    if (getCheckoutProductId('lifetime_plus_sage')) {
+      const res = await openDodoCheckout({
+        product: 'lifetime_plus_sage',
+        userId: user.id,
+        email: user.email,
+        onCheckoutCompleted: () => {
+          try {
+            localStorage.setItem(GENESIS_BUNDLE_CHOICE, 'ltd_sage_year');
+          } catch {
+            /* ignore */
+          }
+          afterGenesisCheckoutBookkeeping();
+        },
+      });
+      if (!res.ok) {
+        if (res.reason === 'sold_out') navigate('/early-access', { replace: true });
+        else toast.error(res.message);
+      }
       return;
     }
     const inv = await fetchGenesisInventory();
@@ -247,7 +268,7 @@ export function GenesisChoicePage() {
               </button>
             </div>
 
-            <div className="flex min-h-[min(22rem,70vh)] flex-col rounded-3xl border border-[#266ba7]/35 bg-gradient-to-b from-[#266ba7]/25 via-[#1a2f45]/50 to-[#0a1929]/90 p-8 shadow-[0_24px_64px_-16px_rgba(38,107,167,0.25)] backdrop-blur-sm transition-all duration-300 hover:border-[#3b82c4]/45 hover:shadow-[0_32px_80px_-12px_rgba(38,107,167,0.3)] md:p-10 lg:p-12">
+            <div className="flex min-h-[min(22rem,70vh)] flex-col rounded-3xl border-2 border-amber-300/35 bg-gradient-to-b from-[#266ba7]/28 via-amber-950/20 to-[#0a1929]/95 p-8 shadow-[0_28px_80px_-14px_rgba(38,107,167,0.32),0_0_0_1px_rgba(251,191,36,0.12)] backdrop-blur-sm transition-all duration-300 hover:border-amber-200/45 hover:shadow-[0_36px_90px_-12px_rgba(38,107,167,0.38),0_0_48px_-20px_rgba(251,191,36,0.18)] md:p-10 lg:p-12">
               <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 text-white ring-1 ring-white/20">
                 <LayoutGrid className="h-6 w-6" strokeWidth={1.75} aria-hidden />
               </div>

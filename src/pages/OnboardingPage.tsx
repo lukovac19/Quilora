@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowRight, Check } from 'lucide-react';
 import { useApp, type User } from '../context/AppContext';
@@ -78,6 +78,8 @@ export function OnboardingPage() {
     }
   }, [user?.name, data.displayName]);
 
+  const persistAndFinishRef = useRef<() => Promise<void>>(async () => {});
+
   const persistAndFinish = useCallback(async () => {
     const v4: QuiloraOnboardingV4 = {
       version: 4,
@@ -105,6 +107,8 @@ export function OnboardingPage() {
     navigate('/dashboard');
   }, [user, setUser, navigate, data]);
 
+  persistAndFinishRef.current = persistAndFinish;
+
   const canProceed = (): boolean => {
     switch (step) {
       case 1:
@@ -131,6 +135,14 @@ export function OnboardingPage() {
       setStep(6);
     }
   };
+
+  useEffect(() => {
+    if (step !== 6) return;
+    const id = window.setTimeout(() => {
+      void persistAndFinishRef.current();
+    }, 3500);
+    return () => window.clearTimeout(id);
+  }, [step]);
 
   const toggleMulti = (field: 'contentTypes' | 'readingHabits', value: string) => {
     setData((d) => {
@@ -340,13 +352,6 @@ export function OnboardingPage() {
                     refund.
                   </p>
                 )}
-                <button
-                  type="button"
-                  onClick={() => void persistAndFinish()}
-                  className="mt-4 w-full rounded-full bg-[#266ba7] py-3.5 text-base font-semibold text-white shadow-lg shadow-[#266ba7]/25 transition-all duration-200 hover:bg-[#3b82c4] hover:shadow-xl"
-                >
-                  Go to My Account
-                </button>
               </div>
             )}
 
