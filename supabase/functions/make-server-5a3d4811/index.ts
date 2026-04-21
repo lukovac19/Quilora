@@ -1155,7 +1155,7 @@ const handleDodoCheckoutSession = async (c: Context) => {
       Deno.env.get('APP_URL')?.trim() ||
       'https://www.quilora.app';
     const returnUrl =
-      Deno.env.get('DODO_CHECKOUT_RETURN_URL')?.trim() || `${site.replace(/\/$/, '')}/checkout/success`;
+      Deno.env.get('DODO_CHECKOUT_RETURN_URL')?.trim() || `${site.replace(/\/$/, '')}/billing/success`;
     const cancelUrl =
       Deno.env.get('DODO_CHECKOUT_CANCEL_URL')?.trim() || `${site.replace(/\/$/, '')}/early-access`;
     const session = await dodoCreateCheckoutSession({

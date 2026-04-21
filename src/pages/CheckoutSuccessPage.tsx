@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { clearCheckoutFunnelEntered } from '../lib/prelaunchFlowFlag';
 
 /**
- * Post–Dodo Checkout Session redirect (`return_url` → `/checkout/success`).
+ * Post–Dodo Checkout Session redirect (`return_url` → `/billing/success`).
  * Plan activation is applied server-side via webhooks; we refresh the session here.
  */
 export function CheckoutSuccessPage() {

@@ -144,14 +144,8 @@ export const router = createBrowserRouter([
         path: "pricing",
         element: <PricingFunnelGate />,
       },
-      {
-        path: "checkout/success",
-        element: (
-          <ProtectedRoute>
-            <CheckoutSuccessPage />
-          </ProtectedRoute>
-        ),
-      },
+      { path: "billing/success", Component: CheckoutSuccessPage },
+      { path: "checkout/success", element: <Navigate to="/billing/success" replace /> },
       { 
         path: "faq", 
         Component: FAQPage 
