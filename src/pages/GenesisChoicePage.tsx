@@ -15,6 +15,7 @@ import {
   isGenesisChoiceFlowPending,
   markGenesisChoiceFlowPending,
 } from '../lib/genesisEarlyAccessSession';
+import { markPrelaunchFlowEntered } from '../lib/prelaunchFlowFlag';
 
 const GENESIS_BUNDLE_CHOICE = 'quiloraGenesisBundleChoice';
 
@@ -30,6 +31,10 @@ export function GenesisChoicePage() {
   const [blockCheckoutForTierChange, setBlockCheckoutForTierChange] = useState(false);
   const fromLifetimePricing =
     (location.state as { genesisLtd?: boolean } | null)?.genesisLtd === true;
+
+  useEffect(() => {
+    markPrelaunchFlowEntered();
+  }, []);
 
   useEffect(() => {
     if (fromLifetimePricing) markGenesisChoiceFlowPending();
@@ -66,10 +71,9 @@ export function GenesisChoicePage() {
 
   const allowed = import.meta.env.DEV || isGenesisChoiceFlowPending() || fromLifetimePricing;
 
-  const finishPostPurchaseOnboarding = useCallback(() => {
+  const afterGenesisCheckoutBookkeeping = useCallback(() => {
     clearGenesisChoiceFlowPending();
-    navigate('/onboarding');
-  }, [navigate]);
+  }, []);
 
   const continueLtdOnly = useCallback(async () => {
     if (blockCheckoutForTierChange) {
@@ -86,7 +90,8 @@ export function GenesisChoicePage() {
       } catch {
         /* ignore */
       }
-      finishPostPurchaseOnboarding();
+      afterGenesisCheckoutBookkeeping();
+      navigate('/early-access', { replace: true });
       return;
     }
     const inv = await fetchGenesisInventory();
@@ -106,14 +111,14 @@ export function GenesisChoicePage() {
         } catch {
           /* ignore */
         }
-        finishPostPurchaseOnboarding();
+        afterGenesisCheckoutBookkeeping();
       },
     });
     if (!res.ok) {
       if (res.reason === 'sold_out') navigate('/early-access', { replace: true });
       else toast.error(res.message);
     }
-  }, [user, navigate, finishPostPurchaseOnboarding, blockCheckoutForTierChange]);
+  }, [user, navigate, afterGenesisCheckoutBookkeeping, blockCheckoutForTierChange]);
 
   const addSageYear = useCallback(async () => {
     if (blockCheckoutForTierChange) {
@@ -130,7 +135,8 @@ export function GenesisChoicePage() {
       } catch {
         /* ignore */
       }
-      finishPostPurchaseOnboarding();
+      afterGenesisCheckoutBookkeeping();
+      navigate('/early-access', { replace: true });
       return;
     }
     const inv = await fetchGenesisInventory();
@@ -155,7 +161,7 @@ export function GenesisChoicePage() {
             } catch {
               /* ignore */
             }
-            finishPostPurchaseOnboarding();
+            afterGenesisCheckoutBookkeeping();
           },
         }).then((res2) => {
           if (!res2.ok) toast.error(res2.message);
@@ -166,7 +172,7 @@ export function GenesisChoicePage() {
       if (res.reason === 'sold_out') navigate('/early-access', { replace: true });
       else toast.error(res.message);
     }
-  }, [user, navigate, finishPostPurchaseOnboarding, blockCheckoutForTierChange]);
+  }, [user, navigate, afterGenesisCheckoutBookkeeping, blockCheckoutForTierChange]);
 
   if (!allowed) {
     return <Navigate to="/early-access" replace />;

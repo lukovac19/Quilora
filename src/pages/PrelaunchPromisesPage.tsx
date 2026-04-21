@@ -1,10 +1,16 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 import { PRELAUNCH_PROMISE_REGISTRY } from '../data/prelaunchPromiseRegistry';
+import { markPrelaunchFlowEntered } from '../lib/prelaunchFlowFlag';
 
 /** Phase 7 — user-visible promise registry (HTML v4). */
 export function PrelaunchPromisesPage() {
+  useEffect(() => {
+    markPrelaunchFlowEntered();
+  }, []);
+
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden" style={{ backgroundColor: '#0a1929', fontFamily: 'Inter, sans-serif' }}>
       <QuiloraMarketingNavBar logoOnly />

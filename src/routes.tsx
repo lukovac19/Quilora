@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate, useRouteError, isRouteErrorResponse } from "react-router";
+import { hasPrelaunchFlowEntered } from "./lib/prelaunchFlowFlag";
 import { RootLayout } from "./layouts/RootLayout";
 import { QuiloraLandingPage } from "./pages/QuiloraLandingPage";
 import { AuthPage } from "./pages/AuthPage";
@@ -76,13 +77,20 @@ const publicHomepageMode = String(import.meta.env.VITE_PUBLIC_HOMEPAGE_MODE ?? "
   .toLowerCase();
 const showPrelaunchHomepage = publicHomepageMode !== "landing";
 
+function LandingHomeGate() {
+  if (hasPrelaunchFlowEntered()) {
+    return <Navigate to="/prelaunch" replace />;
+  }
+  return <QuiloraLandingPage />;
+}
+
 export const router = createBrowserRouter([
   {
     path: "/",
     Component: RootLayout,
     errorElement: <RouteErrorFallback />,
     children: [
-      { index: true, element: showPrelaunchHomepage ? <PreLaunchPage /> : <QuiloraLandingPage /> },
+      { index: true, element: showPrelaunchHomepage ? <PreLaunchPage /> : <LandingHomeGate /> },
       {
         path: "early-access/genesis-welcome",
         element: <Navigate to="/early-access" replace />,
@@ -97,8 +105,9 @@ export const router = createBrowserRouter([
       },
       { path: "early-access", Component: PreLaunchEarlyAccessPage },
       { path: "early-access/promises", Component: PrelaunchPromisesPage },
-      { path: "home", Component: QuiloraLandingPage },
+      { path: "home", element: <LandingHomeGate /> },
       { path: "pre-launch", Component: PreLaunchPage },
+      { path: "prelaunch", Component: PreLaunchPage },
       { path: "pre-launch/early-access", element: <Navigate to="/early-access" replace /> },
       { 
         path: "auth", 

@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useState, useEffect, useCallback } from 'react';
 import { Menu, X, ChevronDown, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { openDodoCheckout, type CheckoutProductKey } from '../lib/billingCheckout';
+import { openDodoCheckout } from '../lib/billingCheckout';
 import { CheckoutButton } from '../components/CheckoutButton';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
 
@@ -14,9 +14,6 @@ let pricingBoostCheckoutThrottleAt = 0;
 export function PricingPage() {
   const { user } = useApp();
   const navigate = useNavigate();
-  const onCheckoutCompletedPlan = useCallback((_product: CheckoutProductKey) => {
-    navigate('/onboarding');
-  }, [navigate]);
   const [searchParams, setSearchParams] = useSearchParams();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -248,7 +245,7 @@ export function PricingPage() {
       {/* EP-02 Landing / Pricing — Bookworm · Sage · Genesis */}
       <section className="px-4 py-12 sm:px-6 sm:py-16">
         <div className="container mx-auto max-w-6xl">
-          <PricingPlansBlock onCheckoutCompleted={onCheckoutCompletedPlan} />
+          <PricingPlansBlock />
         </div>
       </section>
 

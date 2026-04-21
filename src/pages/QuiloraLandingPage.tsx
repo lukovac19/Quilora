@@ -1,6 +1,4 @@
-import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
-import type { CheckoutProductKey } from '../lib/billingCheckout';
 import { useTranslation } from '../lib/translations';
 import { useApp } from '../context/AppContext';
 import type { LucideIcon } from 'lucide-react';
@@ -17,9 +15,6 @@ export function QuiloraLandingPage() {
   const { t } = useTranslation();
   const { theme } = useApp();
   const navigate = useNavigate();
-  const onCheckoutCompletedPlan = useCallback((_product: CheckoutProductKey) => {
-    navigate('/onboarding');
-  }, [navigate]);
   const colors = getThemeColors(theme);
 
   const handleGetStarted = () => {
@@ -335,7 +330,7 @@ export function QuiloraLandingPage() {
             </h2>
             <p className="mx-auto max-w-2xl text-lg text-white/60 sm:text-xl">Select the plan that aligns with your goals.</p>
           </div>
-          <PricingPlansBlock onCheckoutCompleted={onCheckoutCompletedPlan} />
+          <PricingPlansBlock />
         </div>
       </section>
 

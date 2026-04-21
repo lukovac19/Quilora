@@ -1,10 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ArrowRight, Star } from 'lucide-react';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 import { useApp } from '../context/AppContext';
 import { ScrollReveal } from '../components/ScrollReveal';
+import { markPrelaunchFlowEntered } from '../lib/prelaunchFlowFlag';
+
+const QUILORA_HEADLINE_TAIL = 'Quilora';
 
 const testimonials = [
   {
@@ -36,8 +39,25 @@ const testimonials = [
 export function PreLaunchPage() {
   const navigate = useNavigate();
   const { user, authLoading } = useApp();
+  const [quiloraTypeIndex, setQuiloraTypeIndex] = useState(0);
 
   useEffect(() => {
+    markPrelaunchFlowEntered();
+  }, []);
+
+  useEffect(() => {
+    if (quiloraTypeIndex >= QUILORA_HEADLINE_TAIL.length) return;
+    const id = window.setTimeout(() => setQuiloraTypeIndex((n) => n + 1), 70);
+    return () => window.clearTimeout(id);
+  }, [quiloraTypeIndex]);
+
+  useEffect(() => {
+    const skipVerifiedBounce =
+      import.meta.env.DEV ||
+      String(import.meta.env.VITE_SKIP_PRELAUNCH_VERIFIED_REDIRECT ?? '')
+        .trim()
+        .toLowerCase() === 'true';
+    if (skipVerifiedBounce) return;
     if (authLoading) return;
     if (user?.emailConfirmed) {
       // AUTH-10: returning verified users skip splash → pre-launch pricing / account path (not raw canvas).
@@ -52,9 +72,23 @@ export function PreLaunchPage() {
       <main className="flex-1 px-4 pb-16 pt-40 sm:px-6 sm:pb-20 sm:pt-44 md:pt-48 lg:pt-52">
         <div className="mx-auto max-w-5xl space-y-6 text-center sm:space-y-8">
           <div className="animate-fade-in-up space-y-6 sm:space-y-8">
-            <h1 className="quilora-heading-hero mx-auto max-w-4xl font-bold leading-tight text-white">
-              Quote Quest is evolving into Quilora
-            </h1>
+            <div className="relative mx-auto max-w-4xl px-2">
+              <div
+                className="pointer-events-none absolute left-1/2 top-[40%] h-[min(16rem,42vw)] w-[min(36rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full opacity-50"
+                style={{
+                  background:
+                    'radial-gradient(closest-side, rgba(123,189,243,0.18), rgba(38,107,167,0.06) 42%, transparent 72%)',
+                  filter: 'blur(48px)',
+                }}
+                aria-hidden
+              />
+              <h1 className="quilora-heading-hero relative mx-auto max-w-4xl font-bold leading-tight text-white">
+                QuoteQuest is evolving into{' '}
+                <span className="inline-block bg-gradient-to-r from-[#f0f7ff] via-[#7bbdf3] to-[#5ec4e8] bg-clip-text text-transparent drop-shadow-[0_0_18px_rgba(123,189,243,0.22)]">
+                  {QUILORA_HEADLINE_TAIL.slice(0, quiloraTypeIndex)}
+                </span>
+              </h1>
+            </div>
 
             <p className="quilora-subhead mx-auto max-w-3xl text-base leading-relaxed text-white/60 sm:text-lg lg:text-2xl">
               The AI tool that let you ask anything about your books is growing into something bigger — something &apos;Infinite&apos;

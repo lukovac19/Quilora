@@ -1,19 +1,13 @@
-import { useCallback } from 'react';
-import { useNavigate } from 'react-router';
-import type { CheckoutProductKey } from '../lib/billingCheckout';
+import { useEffect } from 'react';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
 import { PricingPlansBlock } from '../components/marketing/PricingPlansBlock';
+import { markPrelaunchFlowEntered } from '../lib/prelaunchFlowFlag';
 
 export function PreLaunchEarlyAccessPage() {
-  const navigate = useNavigate();
-
-  const onCheckoutCompleted = useCallback(
-    (_product: CheckoutProductKey) => {
-      navigate('/onboarding');
-    },
-    [navigate],
-  );
+  useEffect(() => {
+    markPrelaunchFlowEntered();
+  }, []);
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden" style={{ backgroundColor: '#0a1929', fontFamily: 'Inter, sans-serif' }}>
@@ -32,7 +26,7 @@ export function PreLaunchEarlyAccessPage() {
           </header>
 
           <div className="w-full pt-2 md:pt-4">
-            <PricingPlansBlock earlyAccessPricing onCheckoutCompleted={onCheckoutCompleted} />
+            <PricingPlansBlock earlyAccessPricing />
           </div>
         </div>
       </main>

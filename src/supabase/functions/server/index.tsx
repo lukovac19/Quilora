@@ -1158,7 +1158,8 @@ const handleDodoCheckoutSession = async (c: Context) => {
       'https://www.quilora.app';
     const returnUrl =
       Deno.env.get('DODO_CHECKOUT_RETURN_URL')?.trim() || `${site.replace(/\/$/, '')}/checkout/success`;
-    const cancelUrl = Deno.env.get('DODO_CHECKOUT_CANCEL_URL')?.trim() || `${site.replace(/\/$/, '')}/pricing`;
+    const cancelUrl =
+      Deno.env.get('DODO_CHECKOUT_CANCEL_URL')?.trim() || `${site.replace(/\/$/, '')}/prelaunch`;
     const session = await dodoCreateCheckoutSession({
       productCart: [{ product_id: productId, quantity: 1 }],
       metadata: meta,
