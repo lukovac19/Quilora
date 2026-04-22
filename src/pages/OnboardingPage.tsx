@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router';
 import { ArrowRight, Check } from 'lucide-react';
 import { useApp, type User } from '../context/AppContext';
 import { applyOnboardingProfilePatch } from '../lib/profileClientUpdate';
@@ -74,7 +73,6 @@ async function resolveThankYouFirstNameFromAuth(): Promise<string> {
 }
 
 export function OnboardingPage() {
-  const navigate = useNavigate();
   const { user, setUser } = useApp();
   const [thankYouFirstName, setThankYouFirstName] = useState<string | undefined>(undefined);
   const [step, setStep] = useState(1);
@@ -92,9 +90,7 @@ export function OnboardingPage() {
     }
   }, [user?.name, data.displayName]);
 
-  const persistAndFinishRef = useRef<() => Promise<void>>(async () => {});
-
-  const persistAndFinish = useCallback(async () => {
+  const persistOnboardingCompletion = useCallback(async () => {
     const v4: QuiloraOnboardingV4 = {
       version: 4,
       displayName: data.displayName.trim(),
@@ -118,10 +114,9 @@ export function OnboardingPage() {
         userType: mapPersonaToUserType(data.persona),
       });
     }
-    navigate('/dashboard');
-  }, [user, setUser, navigate, data]);
+  }, [user, setUser, data]);
 
-  persistAndFinishRef.current = persistAndFinish;
+  const thankYouPersistStarted = useRef(false);
 
   const canProceed = (): boolean => {
     switch (step) {
@@ -151,12 +146,14 @@ export function OnboardingPage() {
   };
 
   useEffect(() => {
-    if (step !== 6) return;
-    const id = window.setTimeout(() => {
-      void persistAndFinishRef.current();
-    }, 3500);
-    return () => window.clearTimeout(id);
-  }, [step]);
+    if (step !== 6) {
+      thankYouPersistStarted.current = false;
+      return;
+    }
+    if (thankYouPersistStarted.current) return;
+    thankYouPersistStarted.current = true;
+    void persistOnboardingCompletion();
+  }, [step, persistOnboardingCompletion]);
 
   useEffect(() => {
     if (step !== 6) return;
