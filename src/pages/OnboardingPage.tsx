@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { ArrowRight, Check } from 'lucide-react';
 import { useApp, type User } from '../context/AppContext';
 import { applyOnboardingProfilePatch } from '../lib/profileClientUpdate';
+import { supabase } from '../lib/supabase';
 
 /** Pre-launch onboarding v4 — persisted JSON (flow doc Phase 3C). */
 export interface QuiloraOnboardingV4 {
@@ -63,6 +64,7 @@ function mapPersonaToUserType(persona: string): 'student' | 'casual' | 'research
 export function OnboardingPage() {
   const navigate = useNavigate();
   const { user, setUser } = useApp();
+  const [thankYouFirstName, setThankYouFirstName] = useState<string | undefined>(undefined);
   const [step, setStep] = useState(1);
   const [data, setData] = useState({
     displayName: user?.name?.trim() || '',
@@ -144,6 +146,20 @@ export function OnboardingPage() {
     return () => window.clearTimeout(id);
   }, [step]);
 
+  useEffect(() => {
+    if (step !== 6) return;
+    let cancelled = false;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      const raw = (data.session?.user?.user_metadata as { first_name?: string } | undefined)?.first_name;
+      const trimmed = typeof raw === 'string' ? raw.trim() : '';
+      setThankYouFirstName(trimmed.length > 0 ? trimmed : '');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [step]);
+
   const toggleMulti = (field: 'contentTypes' | 'readingHabits', value: string) => {
     setData((d) => {
       const arr = d[field];
@@ -153,8 +169,8 @@ export function OnboardingPage() {
   };
 
   const progressSteps = 6;
-  const showProgress = step >= 1 && step <= 6;
-  const progressIndex = step >= 6 ? 6 : step;
+  const showProgress = step >= 1 && step <= 5;
+  const progressIndex = step;
 
   return (
     <div className="relative flex min-h-screen flex-col" style={{ backgroundColor: '#0a1929', fontFamily: 'Inter, sans-serif' }}>
@@ -190,12 +206,52 @@ export function OnboardingPage() {
               <div className="h-1 w-full overflow-hidden rounded-full bg-white/5">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[#266ba7] to-[#3b82c4] transition-all duration-500 ease-out"
-                  style={{ width: `${(progressIndex / progressSteps) * 100}%` }}
+                  style={{ width: `${(Math.min(progressIndex, progressSteps) / progressSteps) * 100}%` }}
                 />
               </div>
             </div>
           ) : null}
 
+          {step === 6 ? (
+            <div className="relative mx-auto w-full max-w-lg px-0 sm:px-1">
+              <div
+                className="pointer-events-none absolute left-1/2 top-1/2 h-[min(20rem,55vw)] w-[min(28rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#266ba7]/[0.07] blur-3xl"
+                aria-hidden
+              />
+              <div className="animate-onboarding-thank-you relative rounded-3xl border border-white/[0.09] bg-gradient-to-b from-[#152d45]/95 to-[#0c1f30]/98 px-8 py-10 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-md sm:px-11 sm:py-12">
+                <div className="mx-auto max-w-md text-center">
+                  <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                    {thankYouFirstName === undefined
+                      ? "You're all set."
+                      : thankYouFirstName.length > 0
+                        ? `You're all set, ${thankYouFirstName}.`
+                        : "You're all set."}
+                  </h2>
+                  <p className="mt-5 text-base leading-relaxed text-white/[0.62]">
+                    Your canvas is waiting. We&apos;ll let you know the moment Quilora goes live.
+                  </p>
+                  <div className="mt-8 space-y-4 border-t border-white/[0.07] pt-8 text-left">
+                    <p className="text-sm leading-relaxed text-white/45">
+                      Your plan starts on launch day. If Quilora doesn&apos;t reach public launch (full canvas access for
+                      paid users) within 90 days of your purchase, you&apos;ll receive a full refund automatically via Dodo
+                      Payments.
+                    </p>
+                    {user?.profileTier === 'genesis' || user?.genesisBadge ? (
+                      <p className="text-sm leading-relaxed text-white/45">
+                        Changed your mind? Contact support before launch for a full refund. Your Genesis seat will be
+                        released for others.
+                      </p>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-white/45">
+                        Changed your mind? You can cancel anytime before launch day from your account dashboard for a
+                        full refund.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-[#1a2f45]/60 to-[#0a1929]/60 p-8 shadow-2xl backdrop-blur-xl sm:p-10">
             {step === 1 && (
               <div className="animate-fade-in space-y-6">
@@ -329,32 +385,6 @@ export function OnboardingPage() {
               </div>
             )}
 
-            {step === 6 && (
-              <div className="animate-fade-in space-y-6 text-center">
-                <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-                  You&apos;re all set, {data.displayName.trim()}.
-                </h2>
-                <p className="text-base leading-relaxed text-white/60">
-                  Your canvas is waiting. We&apos;ll let you know the moment Quilora goes live.
-                </p>
-                <p className="text-sm leading-relaxed text-white/45">
-                  Your plan starts on launch day. If Quilora doesn&apos;t reach public launch (full canvas access for paid
-                  users) within 90 days of your purchase, you&apos;ll receive a full refund automatically via Dodo Payments.
-                </p>
-                {user?.profileTier === 'genesis' || user?.genesisBadge ? (
-                  <p className="text-sm leading-relaxed text-white/45">
-                    Changed your mind? Contact support before launch for a full refund. Your Genesis seat will be released
-                    for others.
-                  </p>
-                ) : (
-                  <p className="text-sm leading-relaxed text-white/45">
-                    Changed your mind? You can cancel anytime before launch day from your account dashboard for a full
-                    refund.
-                  </p>
-                )}
-              </div>
-            )}
-
             {step <= 5 ? (
               <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-6">
                 {step > 1 ? (
@@ -384,6 +414,7 @@ export function OnboardingPage() {
               </div>
             ) : null}
           </div>
+          )}
         </div>
       </div>
     </div>

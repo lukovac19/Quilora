@@ -413,6 +413,11 @@ export function AuthPage() {
     setError('');
     if (mode === 'login') setPasswordResetSuccessBanner(false);
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedConfirmEmail = confirmEmail.trim().toLowerCase();
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+
     try {
       if (recoveryFlow) {
         const weakNew = getWeakPasswordMessage(newPassword);
@@ -445,17 +450,17 @@ export function AuthPage() {
       if (mode === 'signup') {
         setDuplicateEmailError(false);
         setWeakPasswordMessage(null);
-        if (!firstName.trim()) {
+        if (!normalizedFirstName) {
           setError('Please enter your first name.');
           setLoading(false);
           return;
         }
-        if (!lastName.trim()) {
+        if (!normalizedLastName) {
           setError('Please enter your last name.');
           setLoading(false);
           return;
         }
-        if (email.trim().toLowerCase() !== confirmEmail.trim().toLowerCase()) {
+        if (normalizedEmail !== normalizedConfirmEmail) {
           setError('Confirm Email must match your email.');
           setLoading(false);
           return;
@@ -473,14 +478,14 @@ export function AuthPage() {
         }
         const { data, error: signUpError } = await withTimeout(
           supabase.auth.signUp({
-            email,
+            email: normalizedEmail,
             password,
             options: {
               emailRedirectTo: authRedirectUrl,
               data: {
-                first_name: firstName.trim(),
-                last_name: lastName.trim(),
-                name: [firstName.trim(), lastName.trim()].filter(Boolean).join(' '),
+                first_name: normalizedFirstName,
+                last_name: normalizedLastName,
+                name: [normalizedFirstName, normalizedLastName].filter(Boolean).join(' '),
               },
             },
           }),
@@ -539,25 +544,15 @@ export function AuthPage() {
           navigate(redirect ?? '/dashboard', { replace: true });
         } else {
           setSignUpPendingVerify(true);
-          setModeState('login');
-          setSearchParams(
-            (prev) => {
-              const next = new URLSearchParams(prev);
-              next.set('mode', 'login');
-              return next;
-            },
-            { replace: true },
-          );
-          setError('');
-          setDuplicateEmailError(false);
-          setWeakPasswordMessage(null);
-          setForgotEmailSent(false);
-          showToast('Check your email to confirm your account.', 'success');
+          showToast('Check your email to verify your account.', 'info');
+          navigate('/auth/verify-email', { replace: true });
+          setLoading(false);
+          return;
         }
       } else if (mode === 'login') {
         const { data, error: signInError } = await withTimeout(
           supabase.auth.signInWithPassword({
-            email,
+            email: normalizedEmail,
             password,
           }),
           AUTH_REQUEST_TIMEOUT_MS,
