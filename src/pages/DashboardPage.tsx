@@ -26,6 +26,7 @@ import { PreLaunchAccountHoldingCard } from '../components/prelaunch/PreLaunchAc
 import { useApp, type User } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 import { isPreLaunchHoldingDashboard } from '../lib/preLaunchProductMode';
+import { hasCompletedQuiloraOnboardingV4 } from '../lib/quiloraOnboardingStorage';
 import { QUILORA_EDGE_SLUG, quiloraEdgePostJson } from '../lib/quiloraEdge';
 import { supabase } from '../lib/supabase';
 
@@ -127,6 +128,10 @@ export function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (!hasCompletedQuiloraOnboardingV4()) {
+      navigate('/onboarding');
+      return;
+    }
     const raw = localStorage.getItem('quiloraOnboarding');
     let display: string | null = null;
     if (raw) {

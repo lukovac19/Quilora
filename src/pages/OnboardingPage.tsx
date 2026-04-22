@@ -61,8 +61,8 @@ function mapPersonaToUserType(persona: string): 'student' | 'casual' | 'research
   return 'casual';
 }
 
-/** Thank-you headline: auth metadata first, else first word of onboarding display name (never email). */
-async function resolveThankYouFirstName(displayNameFromOnboarding: string): Promise<string> {
+/** Thank-you headline: `user_metadata.first_name` from signup only (no display name / email). */
+async function resolveThankYouFirstNameFromAuth(): Promise<string> {
   const [{ data: sessionData }, { data: userData }] = await Promise.all([
     supabase.auth.getSession(),
     supabase.auth.getUser(),
@@ -70,14 +70,7 @@ async function resolveThankYouFirstName(displayNameFromOnboarding: string): Prom
   const u = userData.user ?? sessionData.session?.user;
   const meta = u?.user_metadata as { first_name?: string } | undefined;
   const fromMeta = typeof meta?.first_name === 'string' ? meta.first_name.trim() : '';
-  if (fromMeta.length > 0) return fromMeta;
-
-  const dn = displayNameFromOnboarding.trim();
-  if (dn.length > 0 && !dn.includes('@')) {
-    const first = dn.split(/\s+/)[0]?.trim() ?? '';
-    if (first.length > 0) return first;
-  }
-  return '';
+  return fromMeta.length > 0 ? fromMeta : '';
 }
 
 export function OnboardingPage() {
@@ -169,14 +162,14 @@ export function OnboardingPage() {
     if (step !== 6) return;
     let cancelled = false;
     setThankYouFirstName(undefined);
-    void resolveThankYouFirstName(data.displayName).then((resolved) => {
+    void resolveThankYouFirstNameFromAuth().then((resolved) => {
       if (cancelled) return;
       setThankYouFirstName(resolved.length > 0 ? resolved : '');
     });
     return () => {
       cancelled = true;
     };
-  }, [step, data.displayName]);
+  }, [step]);
 
   const toggleMulti = (field: 'contentTypes' | 'readingHabits', value: string) => {
     setData((d) => {
@@ -252,7 +245,7 @@ export function OnboardingPage() {
                         <span className="text-[#e8f4ff]">{thankYouFirstName}</span>.
                       </>
                     ) : (
-                      "You're all set."
+                      <>You&apos;re all set.</>
                     )}
                   </h2>
                   <p className="mx-auto mt-6 max-w-sm text-base leading-relaxed text-white/[0.62] sm:text-lg">
