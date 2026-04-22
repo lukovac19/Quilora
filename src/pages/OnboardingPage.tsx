@@ -61,6 +61,25 @@ function mapPersonaToUserType(persona: string): 'student' | 'casual' | 'research
   return 'casual';
 }
 
+/** Thank-you headline: auth metadata first, else first word of onboarding display name (never email). */
+async function resolveThankYouFirstName(displayNameFromOnboarding: string): Promise<string> {
+  const [{ data: sessionData }, { data: userData }] = await Promise.all([
+    supabase.auth.getSession(),
+    supabase.auth.getUser(),
+  ]);
+  const u = userData.user ?? sessionData.session?.user;
+  const meta = u?.user_metadata as { first_name?: string } | undefined;
+  const fromMeta = typeof meta?.first_name === 'string' ? meta.first_name.trim() : '';
+  if (fromMeta.length > 0) return fromMeta;
+
+  const dn = displayNameFromOnboarding.trim();
+  if (dn.length > 0 && !dn.includes('@')) {
+    const first = dn.split(/\s+/)[0]?.trim() ?? '';
+    if (first.length > 0) return first;
+  }
+  return '';
+}
+
 export function OnboardingPage() {
   const navigate = useNavigate();
   const { user, setUser } = useApp();
@@ -149,16 +168,15 @@ export function OnboardingPage() {
   useEffect(() => {
     if (step !== 6) return;
     let cancelled = false;
-    void supabase.auth.getSession().then(({ data }) => {
+    setThankYouFirstName(undefined);
+    void resolveThankYouFirstName(data.displayName).then((resolved) => {
       if (cancelled) return;
-      const raw = (data.session?.user?.user_metadata as { first_name?: string } | undefined)?.first_name;
-      const trimmed = typeof raw === 'string' ? raw.trim() : '';
-      setThankYouFirstName(trimmed.length > 0 ? trimmed : '');
+      setThankYouFirstName(resolved.length > 0 ? resolved : '');
     });
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [step, data.displayName]);
 
   const toggleMulti = (field: 'contentTypes' | 'readingHabits', value: string) => {
     setData((d) => {
@@ -213,36 +231,46 @@ export function OnboardingPage() {
           ) : null}
 
           {step === 6 ? (
-            <div className="relative mx-auto w-full max-w-lg px-0 sm:px-1">
+            <div className="animate-onboarding-thank-you relative mx-auto flex w-full max-w-lg flex-col items-center px-1 sm:px-2">
               <div
-                className="pointer-events-none absolute left-1/2 top-1/2 h-[min(20rem,55vw)] w-[min(28rem,92vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#266ba7]/[0.07] blur-3xl"
+                className="pointer-events-none absolute left-1/2 top-[42%] h-[min(22rem,58vw)] w-[min(32rem,96vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#266ba7]/[0.1] blur-[48px]"
                 aria-hidden
               />
-              <div className="animate-onboarding-thank-you relative rounded-3xl border border-white/[0.09] bg-gradient-to-b from-[#152d45]/95 to-[#0c1f30]/98 px-8 py-10 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] backdrop-blur-md sm:px-11 sm:py-12">
-                <div className="mx-auto max-w-md text-center">
-                  <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                    {thankYouFirstName === undefined
-                      ? "You're all set."
-                      : thankYouFirstName.length > 0
-                        ? `You're all set, ${thankYouFirstName}.`
-                        : "You're all set."}
+              <div
+                className="pointer-events-none absolute left-1/2 top-[58%] h-[min(14rem,40vw)] w-[min(22rem,85vw)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#7bbdf3]/[0.05] blur-[40px]"
+                aria-hidden
+              />
+              <div className="relative w-full max-w-md rounded-3xl border border-white/10 bg-gradient-to-b from-[#1a3350]/[0.97] to-[#0f2234]/[0.99] px-10 py-12 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] ring-1 ring-white/[0.05] backdrop-blur-md sm:px-12 sm:py-14">
+                <div className="mx-auto h-px w-20 bg-gradient-to-r from-transparent via-[#7bbdf3]/35 to-transparent" aria-hidden />
+                <div className="mx-auto mt-8 max-w-[22rem] text-center">
+                  <h2 className="text-balance text-3xl font-semibold tracking-tight text-white sm:text-4xl sm:leading-snug">
+                    {thankYouFirstName === undefined ? (
+                      <span className="inline-block text-white/35">You&apos;re all set.</span>
+                    ) : thankYouFirstName.length > 0 ? (
+                      <>
+                        You&apos;re all set,{' '}
+                        <span className="text-[#e8f4ff]">{thankYouFirstName}</span>.
+                      </>
+                    ) : (
+                      "You're all set."
+                    )}
                   </h2>
-                  <p className="mt-5 text-base leading-relaxed text-white/[0.62]">
+                  <p className="mx-auto mt-6 max-w-sm text-base leading-relaxed text-white/[0.62] sm:text-lg">
                     Your canvas is waiting. We&apos;ll let you know the moment Quilora goes live.
                   </p>
-                  <div className="mt-8 space-y-4 border-t border-white/[0.07] pt-8 text-left">
-                    <p className="text-sm leading-relaxed text-white/45">
+                  <div className="mx-auto mt-10 max-w-sm space-y-5 border-t border-white/[0.08] pt-10 text-left">
+                    <p className="text-sm leading-relaxed text-white/[0.48]">
                       Your plan starts on launch day. If Quilora doesn&apos;t reach public launch (full canvas access for
                       paid users) within 90 days of your purchase, you&apos;ll receive a full refund automatically via Dodo
                       Payments.
                     </p>
                     {user?.profileTier === 'genesis' || user?.genesisBadge ? (
-                      <p className="text-sm leading-relaxed text-white/45">
+                      <p className="text-sm leading-relaxed text-white/[0.48]">
                         Changed your mind? Contact support before launch for a full refund. Your Genesis seat will be
                         released for others.
                       </p>
                     ) : (
-                      <p className="text-sm leading-relaxed text-white/45">
+                      <p className="text-sm leading-relaxed text-white/[0.48]">
                         Changed your mind? You can cancel anytime before launch day from your account dashboard for a
                         full refund.
                       </p>
