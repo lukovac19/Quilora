@@ -9,6 +9,7 @@ import { Mail, Lock, X, Sparkles, LayoutGrid, BrainCircuit, Highlighter } from '
 import { ModernNavbar } from '../components/ModernNavbar';
 import { safeInternalPath } from '../lib/safeInternalPath';
 import { markGenesisChoiceFlowPending } from '../lib/genesisEarlyAccessSession';
+import { resolveSupabaseProjectId } from '../utils/supabase/credentials';
 
 const GENESIS_CHOICE_REDIRECT_PATH = '/early-access/genesis-choice';
 
@@ -38,6 +39,11 @@ function isDuplicateEmailError(err: unknown): boolean {
 /** Supabase often returns this when Auth email (SMTP / built-in) is not configured or confirm-email flow fails. */
 function formatAuthProviderHint(message: string): string {
   const lower = message.toLowerCase();
+  if (lower.includes('unsupported provider') || lower.includes('provider is not enabled')) {
+    const ref = resolveSupabaseProjectId();
+    const supabaseCallback = `https://${ref}.supabase.co/auth/v1/callback`;
+    return `${message}\n\nGoogle nije uključen u ovom Supabase projektu. U Supabase Dashboard → Authentication → Providers → Google uključi provider i unesi OAuth Client ID i Client Secret (Google Cloud Console → APIs & Services → Credentials). U Google OAuth klijentu, Authorized redirect URIs mora uključivati: ${supabaseCallback}. Zatim u Supabase → Authentication → URL Configuration dodaj redirect na tvoju aplikaciju (npr. http://localhost:5173/auth za dev).`;
+  }
   if (lower.includes('timed out')) {
     return `${message}\n\nCheck your connection. If it keeps happening, confirm the Supabase project is not paused (Dashboard → Project settings) and that VITE_SUPABASE_* env values match the project.`;
   }
@@ -402,7 +408,7 @@ export function AuthPage() {
       if (oauthError) throw oauthError;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Social login failed';
-      setError(message);
+      setError(formatAuthProviderHint(message));
       setLoading(false);
     }
   };
