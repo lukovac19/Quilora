@@ -12,7 +12,7 @@ const sectionTitleClass = 'text-xl font-bold tracking-tight text-[#3b82c4] sm:te
 export function AboutPage() {
   return (
     <div className="min-h-screen min-w-0 overflow-x-hidden bg-[#0a1929] font-[Inter,sans-serif] text-white">
-      <QuiloraMarketingNavBar />
+      <QuiloraMarketingNavBar logoOnly />
 
       <section className="relative overflow-x-hidden px-4 pb-12 pt-28 sm:px-6 sm:pb-16 sm:pt-32 lg:pb-20 lg:pt-44">
         <div className="pointer-events-none absolute inset-0 z-0" style={{ background: QUILORA_LANDING_GRADIENT }} aria-hidden />
@@ -90,6 +90,10 @@ export function AboutPage() {
               </Link>
             </div>
           </ScrollReveal>
+
+          <p className="mx-auto max-w-xl pb-6 text-center text-[10px] font-normal leading-relaxed tracking-[0.14em] text-white/22 sm:text-[11px] sm:tracking-[0.12em]">
+            Made by Ema Lukovac
+          </p>
         </div>
       </section>
 

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router';
 import { ArrowRight, Star } from 'lucide-react';
 import { QuiloraMarketingNavBar } from '../components/QuiloraMarketingNavBar';
 import { QuiloraSiteFooter } from '../components/QuiloraSiteFooter';
-import { useApp } from '../context/AppContext';
 import { ScrollReveal } from '../components/ScrollReveal';
 import { markPrelaunchFlowEntered } from '../lib/prelaunchFlowFlag';
 
@@ -38,7 +37,6 @@ const testimonials = [
 
 export function PreLaunchPage() {
   const navigate = useNavigate();
-  const { user, authLoading } = useApp();
   const [quiloraRevealStarted, setQuiloraRevealStarted] = useState(false);
   const [quiloraVisibleCount, setQuiloraVisibleCount] = useState(0);
 
@@ -59,14 +57,6 @@ export function PreLaunchPage() {
   }, [quiloraRevealStarted, quiloraVisibleCount]);
 
   const quiloraComplete = quiloraVisibleCount >= QUILORA_HEADLINE_TAIL.length;
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (user?.emailConfirmed) {
-      // AUTH-10: returning verified users skip splash → pre-launch pricing / account path (not raw canvas).
-      navigate('/early-access', { replace: true });
-    }
-  }, [authLoading, user?.emailConfirmed, navigate]);
 
   return (
     <div className="flex min-h-screen min-w-0 flex-col overflow-x-hidden" style={{ backgroundColor: '#0a1929', fontFamily: 'Inter, sans-serif' }}>
